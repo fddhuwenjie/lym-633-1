@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { 
   Clock, Award, Calendar, 
-  ChevronRight, Award as AwardIcon
+  ChevronRight, Award as AwardIcon,
+  Edit, Send, X, AlertCircle
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useUserStore } from '../../store/useUserStore';
@@ -16,10 +17,13 @@ type TabType = 'registrations' | 'workhours' | 'certificates';
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState<TabType>('registrations');
+  const [editingWorkHour, setEditingWorkHour] = useState<string | null>(null);
+  const [editHours, setEditHours] = useState<string>('');
+  const [editRemarks, setEditRemarks] = useState<string>('');
   
   const { getCurrentUser, users } = useUserStore();
   const { getRegistrationsByUserId } = useRegistrationStore();
-  const { getWorkHoursByUserId, getTotalApprovedHours } = useWorkHourStore();
+  const { getWorkHoursByUserId, getTotalApprovedHours, updateWorkHour, resubmitWorkHour, submitWorkHour } = useWorkHourStore();
   const { getCertificatesByUserId } = useCertificateStore();
   const { getActivityById, getPositionById } = useActivityStore();
 
@@ -97,6 +101,33 @@ const Profile = () => {
       revoked: '已撤销'
     };
     return map[status] || status;
+  };
+
+  const handleEditWorkHour = (whId: string) => {
+    const wh = useWorkHourStore.getState().getWorkHourById(whId);
+    if (!wh) return;
+    setEditingWorkHour(whId);
+    setEditHours(String(wh.hours));
+    setEditRemarks(wh.remarks || '');
+  };
+
+  const handleSaveWorkHour = () => {
+    if (!editingWorkHour) return;
+    const hours = parseFloat(editHours);
+    if (isNaN(hours) || hours <= 0) {
+      alert('请输入有效的服务时长');
+      return;
+    }
+    updateWorkHour(editingWorkHour, { hours, remarks: editRemarks });
+    setEditingWorkHour(null);
+  };
+
+  const handleResubmitWorkHour = (whId: string) => {
+    resubmitWorkHour(whId);
+  };
+
+  const handleSubmitDraft = (whId: string) => {
+    submitWorkHour(whId);
   };
 
   return (
@@ -274,39 +305,86 @@ const Profile = () => {
                   .sort((a, b) => new Date(b.submittedAt || '').getTime() - new Date(a.submittedAt || '').getTime())
                   .map(wh => {
                     const activity = getActivityById(wh.activityId);
+                    const isEditable = wh.status === 'rejected' || wh.status === 'draft';
+                    const isResubmittable = wh.status === 'rejected';
+                    const isSubmittable = wh.status === 'draft';
                     return (
                       <div
                         key={wh.id}
-                        className="flex items-center justify-between p-4 bg-slate-50 rounded-xl"
+                        className={`p-4 rounded-xl ${wh.status === 'rejected' ? 'bg-red-50 border border-red-200' : wh.status === 'draft' ? 'bg-blue-50 border border-blue-200' : 'bg-slate-50'}`}
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
-                            <Clock className="text-primary-600" size={24} />
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-slate-800">
-                              {activity?.title}
-                            </h3>
-                            <p className="text-sm text-slate-500">
-                              {wh.submittedAt ? `提交时间：${formatDateTime(wh.submittedAt)}` : '草稿'}
-                              {wh.reviewedAt && ` · 审核时间：${formatDateTime(wh.reviewedAt)}`}
-                            </p>
-                            {wh.rejectReason && (
-                              <p className="text-xs text-red-600 mt-1">
-                                退回原因：{wh.rejectReason}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${wh.status === 'rejected' ? 'bg-red-100' : wh.status === 'draft' ? 'bg-blue-100' : 'bg-primary-100'}`}>
+                              <Clock className={wh.status === 'rejected' ? 'text-red-600' : wh.status === 'draft' ? 'text-blue-600' : 'text-primary-600'} size={24} />
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-slate-800">
+                                {activity?.title}
+                              </h3>
+                              <p className="text-sm text-slate-500">
+                                {wh.submittedAt ? `提交时间：${formatDateTime(wh.submittedAt)}` : '草稿'}
+                                {wh.reviewedAt && ` · 审核时间：${formatDateTime(wh.reviewedAt)}`}
                               </p>
-                            )}
+                              {wh.rejectReason && (
+                                <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                                  <AlertCircle size={14} />
+                                  退回原因：{wh.rejectReason}
+                                </p>
+                              )}
+                              {wh.remarks && (
+                                <p className="text-xs text-slate-500 mt-1">
+                                  备注：{wh.remarks}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xl font-bold text-slate-800">
+                              {wh.hours.toFixed(1)}
+                              <span className="text-sm font-normal text-slate-500 ml-1">小时</span>
+                            </p>
+                            <span className={`badge ${statusBadgeClass(wh.status)} mt-1`}>
+                              {statusLabel(wh.status)}
+                            </span>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-xl font-bold text-slate-800">
-                            {wh.hours.toFixed(1)}
-                            <span className="text-sm font-normal text-slate-500 ml-1">小时</span>
-                          </p>
-                          <span className={`badge ${statusBadgeClass(wh.status)} mt-1`}>
-                            {statusLabel(wh.status)}
-                          </span>
-                        </div>
+                        {isEditable && (
+                          <div className="mt-3 pt-3 border-t border-slate-200 flex items-center justify-between">
+                            <p className="text-xs text-slate-500">
+                              {wh.status === 'rejected' ? '请根据退回原因修正后重新提交' : '确认信息无误后提交审核'}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              {isEditable && (
+                                <button
+                                  onClick={() => handleEditWorkHour(wh.id)}
+                                  className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1"
+                                >
+                                  <Edit size={14} />
+                                  修改
+                                </button>
+                              )}
+                              {isResubmittable && (
+                                <button
+                                  onClick={() => handleResubmitWorkHour(wh.id)}
+                                  className="btn-primary text-sm py-1.5 px-3 flex items-center gap-1"
+                                >
+                                  <Send size={14} />
+                                  重新提交
+                                </button>
+                              )}
+                              {isSubmittable && (
+                                <button
+                                  onClick={() => handleSubmitDraft(wh.id)}
+                                  className="btn-primary text-sm py-1.5 px-3 flex items-center gap-1"
+                                >
+                                  <Send size={14} />
+                                  提交审核
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })
@@ -384,6 +462,93 @@ const Profile = () => {
           )}
         </div>
       </div>
+
+      {editingWorkHour && (() => {
+        const wh = useWorkHourStore.getState().getWorkHourById(editingWorkHour);
+        const activity = wh ? getActivityById(wh.activityId) : null;
+        return (
+          <div 
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setEditingWorkHour(null)}
+          >
+            <div 
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                  <Edit className="text-primary-600" size={20} />
+                  修改工时记录
+                </h3>
+                <button
+                  onClick={() => setEditingWorkHour(null)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {activity && (
+                <div className="mb-4 p-3 bg-slate-50 rounded-lg">
+                  <p className="text-sm text-slate-500">活动名称</p>
+                  <p className="font-medium text-slate-800">{activity.title}</p>
+                </div>
+              )}
+
+              {wh?.rejectReason && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-xs text-red-600 font-medium mb-1">上次退回原因</p>
+                  <p className="text-sm text-red-700">{wh.rejectReason}</p>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    服务时长（小时）
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={editHours}
+                    onChange={e => setEditHours(e.target.value)}
+                    className="input-field"
+                    placeholder="请输入服务时长"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    备注（选填）
+                  </label>
+                  <textarea
+                    value={editRemarks}
+                    onChange={e => setEditRemarks(e.target.value)}
+                    rows={3}
+                    className="input-field w-full"
+                    placeholder="请补充说明..."
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setEditingWorkHour(null)}
+                  className="btn-secondary"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleSaveWorkHour}
+                  className="btn-primary"
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

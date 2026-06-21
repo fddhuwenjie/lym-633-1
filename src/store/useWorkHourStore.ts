@@ -3,6 +3,7 @@ import { WorkHour, WorkHourStatus } from '../types';
 import { getStorageItem, setStorageItem } from '../utils/storage';
 import { mockWorkHours } from '../data/mockData';
 import { generateId } from '../utils/idGenerator';
+import { useCertificateStore } from './useCertificateStore';
 
 interface WorkHourStore {
   workHours: WorkHour[];
@@ -14,6 +15,7 @@ interface WorkHourStore {
   getPendingWorkHours: () => WorkHour[];
   addWorkHour: (data: Omit<WorkHour, 'id' | 'status' | 'submittedAt' | 'reviewedAt' | 'reviewerId' | 'rejectReason'>) => WorkHour;
   submitWorkHour: (id: string) => void;
+  resubmitWorkHour: (id: string) => void;
   approveWorkHour: (id: string, reviewerId: string) => void;
   rejectWorkHour: (id: string, reviewerId: string, reason: string) => void;
   updateWorkHour: (id: string, updates: Partial<WorkHour>) => void;
@@ -29,7 +31,23 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
       set({ workHours: mockWorkHours });
       setStorageItem('workhours', mockWorkHours);
     } else {
-      set({ workHours: stored });
+      const hasWh003 = stored.some(w => w.id === 'wh-003');
+      const hasWh004 = stored.some(w => w.id === 'wh-004');
+      const merged = [...stored];
+      if (!hasWh003) {
+        const wh003 = mockWorkHours.find(w => w.id === 'wh-003');
+        if (wh003) merged.push(wh003);
+      }
+      if (!hasWh004) {
+        const wh004 = mockWorkHours.find(w => w.id === 'wh-004');
+        if (wh004) merged.push(wh004);
+      }
+      if (merged.length !== stored.length) {
+        set({ workHours: merged });
+        setStorageItem('workhours', merged);
+      } else {
+        set({ workHours: stored });
+      }
     }
   },
 
@@ -85,6 +103,21 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
     setStorageItem('workhours', newWorkHours);
   },
 
+  resubmitWorkHour: (id) => {
+    const newWorkHours = get().workHours.map(w =>
+      w.id === id ? { 
+        ...w, 
+        status: 'pending' as WorkHourStatus,
+        submittedAt: new Date().toISOString(),
+        reviewedAt: null,
+        reviewerId: null,
+        rejectReason: null
+      } : w
+    );
+    set({ workHours: newWorkHours });
+    setStorageItem('workhours', newWorkHours);
+  },
+
   approveWorkHour: (id, reviewerId) => {
     const newWorkHours = get().workHours.map(w =>
       w.id === id ? {
@@ -110,6 +143,11 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
     );
     set({ workHours: newWorkHours });
     setStorageItem('workhours', newWorkHours);
+
+    const existingCert = useCertificateStore.getState().getCertificateByWorkHourId(id);
+    if (existingCert && existingCert.status === 'valid') {
+      useCertificateStore.getState().revokeCertificate(existingCert.id);
+    }
   },
 
   updateWorkHour: (id, updates) => {

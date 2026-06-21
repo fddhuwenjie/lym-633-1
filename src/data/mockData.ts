@@ -386,6 +386,32 @@ export const mockWorkHours: WorkHour[] = [
     rejectReason: null,
     submittedAt: '2024-05-21T10:00:00Z',
     reviewedAt: '2024-05-22T10:30:00Z'
+  },
+  {
+    id: 'wh-003',
+    registrationId: 'reg-001',
+    userId: 'user-003',
+    activityId: 'act-001',
+    hours: 5.5,
+    status: 'rejected',
+    reviewerId: 'user-002',
+    rejectReason: '服务时长与签到记录不符，请核实后重新提交',
+    submittedAt: '2024-06-16T10:00:00Z',
+    reviewedAt: '2024-06-17T09:00:00Z',
+    remarks: '清洁志愿者服务'
+  },
+  {
+    id: 'wh-004',
+    registrationId: 'reg-001',
+    userId: 'user-003',
+    activityId: 'act-001',
+    hours: 6,
+    status: 'draft',
+    reviewerId: null,
+    rejectReason: null,
+    submittedAt: null,
+    reviewedAt: null,
+    remarks: '清洁志愿者服务草稿'
   }
 ];
 
