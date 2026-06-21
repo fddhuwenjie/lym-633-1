@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { 
-  Clock, Award, Calendar, 
+import {
+  Clock, Award, Calendar,
   ChevronRight, Award as AwardIcon,
   Edit, Send, X, AlertCircle
 } from 'lucide-react';
@@ -22,7 +22,7 @@ const Profile = () => {
   const [editingWorkHour, setEditingWorkHour] = useState<string | null>(null);
   const [editHours, setEditHours] = useState<string>('');
   const [editRemarks, setEditRemarks] = useState<string>('');
-  
+
   const { getCurrentUser, users } = useUserStore();
   const { getRegistrationsByUserId } = useRegistrationStore();
   const { getWorkHoursByUserId, getTotalApprovedHours, updateWorkHour, resubmitWorkHour, submitWorkHour } = useWorkHourStore();
@@ -45,7 +45,7 @@ const Profile = () => {
 
   const monthlyStats = useMemo(() => {
     const months: Record<string, number> = {};
-    
+
     userWorkHours
       .filter(w => w.status === 'approved')
       .forEach(wh => {
@@ -181,7 +181,7 @@ const Profile = () => {
                 {currentUser.name}
               </h1>
               <p className="text-primary-100 mb-2">
-                {currentUser.role === 'organizer' ? '活动组织者' : 
+                {currentUser.role === 'organizer' ? '活动组织者' :
                  currentUser.role === 'manager' ? '岗位负责人' : '志愿者'}
               </p>
               <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
@@ -249,16 +249,16 @@ const Profile = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 12 }} />
                 <YAxis tick={{ fill: '#64748b', fontSize: 12 }} />
-                <Tooltip 
-                  contentStyle={{ 
-                    borderRadius: '8px', 
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: '8px',
                     border: '1px solid #e2e8f0',
                     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
                   }}
                 />
-                <Bar 
-                  dataKey="时长" 
-                  fill="#0d9488" 
+                <Bar
+                  dataKey="时长"
+                  fill="#0d9488"
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
@@ -468,9 +468,9 @@ const Profile = () => {
                         >
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-2">
-                              <AwardIcon 
-                                size={28} 
-                                className={cert.status === 'valid' ? 'text-amber-500' : 'text-slate-400'} 
+                              <AwardIcon
+                                size={28}
+                                className={cert.status === 'valid' ? 'text-amber-500' : 'text-slate-400'}
                               />
                               <div>
                                 <h3 className="font-serif font-bold text-slate-800">
@@ -483,7 +483,7 @@ const Profile = () => {
                               {cert.status === 'valid' ? '有效' : '已撤销'}
                             </span>
                           </div>
-                          
+
                           <div className="space-y-2 text-sm">
                             <p className="text-slate-600">
                               持证人：<span className="font-medium text-slate-800">{currentUser.name}</span>
@@ -596,7 +596,7 @@ const Profile = () => {
                           const activity = getActivityById(record.activityId);
                           const position = getPositionById(record.positionId);
                           const timeSlot = record.timeSlotId ? getTimeSlotById(record.timeSlotId) : null;
-                          
+
                           const typeBadgeClass = (type: ServiceQualityType) => {
                             switch (type) {
                               case 'normal':
@@ -679,11 +679,11 @@ const Profile = () => {
         const wh = useWorkHourStore.getState().getWorkHourById(editingWorkHour);
         const activity = wh ? getActivityById(wh.activityId) : null;
         return (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
             onClick={() => setEditingWorkHour(null)}
           >
-            <div 
+            <div
               className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
               onClick={e => e.stopPropagation()}
             >

@@ -17,7 +17,7 @@ interface WorkHourStore {
   addWorkHour: (data: Omit<WorkHour, 'id' | 'status' | 'submittedAt' | 'reviewedAt' | 'reviewerId' | 'rejectReason' | 'suggestedHours'>) => WorkHour;
   submitWorkHour: (id: string) => { success: boolean; reason?: string };
   resubmitWorkHour: (id: string) => void;
-  approveWorkHour: (id: string, reviewerId: string) => void;
+  approveWorkHour: (id: string, reviewerId: string) => { success: boolean; reason?: string };
   rejectWorkHour: (id: string, reviewerId: string, reason: string) => void;
   updateWorkHour: (id: string, updates: Partial<WorkHour>) => void;
   getTotalApprovedHours: (userId: string) => number;
@@ -79,11 +79,11 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
 
   canSubmitWorkHour: (registrationId) => {
     const { hasAbsentRecord, calculateSuggestedHours } = useServiceQualityStore.getState();
-    
+
     if (hasAbsentRecord(registrationId)) {
       return { canSubmit: false, reason: '存在缺勤记录，不允许提交工时，请联系负责人' };
     }
-    
+
     return { canSubmit: true };
   },
 
@@ -125,7 +125,7 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
     if (!workHour) return { success: false, reason: '工时记录不存在' };
 
     const { hasAbsentRecord, calculateSuggestedHours } = useServiceQualityStore.getState();
-    
+
     if (hasAbsentRecord(workHour.registrationId)) {
       return { success: false, reason: '存在缺勤记录，不允许提交工时，请联系负责人' };
     }
@@ -133,8 +133,8 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
     const suggestedHours = calculateSuggestedHours(workHour.registrationId);
 
     const newWorkHours = get().workHours.map(w =>
-      w.id === id ? { 
-        ...w, 
+      w.id === id ? {
+        ...w,
         status: 'pending' as WorkHourStatus,
         submittedAt: new Date().toISOString(),
         suggestedHours
@@ -153,8 +153,8 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
     const suggestedHours = calculateSuggestedHours(workHour.registrationId);
 
     const newWorkHours = get().workHours.map(w =>
-      w.id === id ? { 
-        ...w, 
+      w.id === id ? {
+        ...w,
         status: 'pending' as WorkHourStatus,
         submittedAt: new Date().toISOString(),
         reviewedAt: null,
@@ -169,9 +169,14 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
 
   approveWorkHour: (id, reviewerId) => {
     const workHour = get().getWorkHourById(id);
-    if (!workHour) return;
+    if (!workHour) return { success: false, reason: '工时记录不存在' };
 
-    const { calculateSuggestedHours } = useServiceQualityStore.getState();
+    const { hasAbsentRecord, calculateSuggestedHours } = useServiceQualityStore.getState();
+
+    if (hasAbsentRecord(workHour.registrationId)) {
+      return { success: false, reason: '存在缺勤记录，不允许通过审核' };
+    }
+
     const suggestedHours = calculateSuggestedHours(workHour.registrationId);
 
     const newWorkHours = get().workHours.map(w =>
@@ -185,7 +190,7 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
     );
     set({ workHours: newWorkHours });
     setStorageItem('workhours', newWorkHours);
-    
+
     useCertificateStore.getState().generateCertificate(
       workHour.id,
       workHour.userId,
@@ -193,6 +198,8 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
       workHour.hours,
       reviewerId
     );
+
+    return { success: true };
   },
 
   rejectWorkHour: (id, reviewerId, reason) => {

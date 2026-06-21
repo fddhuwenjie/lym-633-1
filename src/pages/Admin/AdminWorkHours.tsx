@@ -3,7 +3,6 @@ import { Clock, Check, X, AlertCircle, UserCheck, AlertTriangle } from 'lucide-r
 import { useWorkHourStore } from '../../store/useWorkHourStore';
 import { useActivityStore } from '../../store/useActivityStore';
 import { useUserStore } from '../../store/useUserStore';
-import { useCertificateStore } from '../../store/useCertificateStore';
 import { useServiceQualityStore } from '../../store/useServiceQualityStore';
 import { useRegistrationStore } from '../../store/useRegistrationStore';
 import { formatDateTime, formatTime } from '../../utils/date';
@@ -28,13 +27,11 @@ const AdminWorkHours = () => {
   const { workHours, approveWorkHour, rejectWorkHour, getWorkHourById } = useWorkHourStore();
   const { getActivityById, getTimeSlotsByIds } = useActivityStore();
   const { getCurrentUser, getUserById } = useUserStore();
-  const { generateCertificate } = useCertificateStore();
-  const { getRecordsByRegistrationId, hasAbsentRecord } = useServiceQualityStore();
+  const { hasAbsentRecord, getRecordsByRegistrationId } = useServiceQualityStore();
   const { getRegistrationById } = useRegistrationStore();
   
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
-  const [showAbsentConfirmModal, setShowAbsentConfirmModal] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
   const currentUser = getCurrentUser();
@@ -59,15 +56,10 @@ const AdminWorkHours = () => {
       return;
     }
 
-    approveWorkHour(whId, currentUser.id);
-    
-    generateCertificate(
-      workHour.id,
-      workHour.userId,
-      workHour.activityId,
-      workHour.hours,
-      currentUser.id
-    );
+    const result = approveWorkHour(whId, currentUser.id);
+    if (!result.success) {
+      alert(result.reason || '审核失败');
+    }
   };
 
   const handleApprove = (whId: string) => {
@@ -75,18 +67,11 @@ const AdminWorkHours = () => {
     if (!workHour) return;
 
     if (hasAbsentRecord(workHour.registrationId)) {
-      setShowAbsentConfirmModal(whId);
+      alert('存在缺勤记录，不允许通过审核');
       return;
     }
 
     doApprove(whId);
-  };
-
-  const handleConfirmAbsentApprove = () => {
-    if (showAbsentConfirmModal) {
-      doApprove(showAbsentConfirmModal);
-      setShowAbsentConfirmModal(null);
-    }
   };
 
   const handleReject = (whId: string) => {
@@ -434,42 +419,6 @@ const AdminWorkHours = () => {
                 className="btn-danger"
               >
                 确认退回
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAbsentConfirmModal && (
-        <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowAbsentConfirmModal(null)}
-        >
-          <div 
-            className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
-            onClick={e => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-              <AlertTriangle className="text-amber-500" size={20} />
-              存在缺勤记录
-            </h3>
-            
-            <p className="text-sm text-slate-600 mb-6">
-              该工时记录关联的报名存在缺勤记录，确认要通过审核吗？
-            </p>
-            
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowAbsentConfirmModal(null)}
-                className="btn-secondary"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleConfirmAbsentApprove}
-                className="btn-primary"
-              >
-                确认通过
               </button>
             </div>
           </div>

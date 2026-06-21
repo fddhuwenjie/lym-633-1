@@ -41,14 +41,14 @@ const ExportPage = () => {
     return userWorkHours.filter(wh => {
       if (activityFilter !== 'all' && wh.activityId !== activityFilter) return false;
       if (statusFilter !== 'all' && wh.status !== statusFilter) return false;
-      
+
       if (dateRange.start && wh.submittedAt) {
         if (new Date(wh.submittedAt) < new Date(dateRange.start)) return false;
       }
       if (dateRange.end && wh.submittedAt) {
         if (new Date(wh.submittedAt) > new Date(dateRange.end + 'T23:59:59')) return false;
       }
-      
+
       return true;
     }).sort((a, b) => new Date(b.submittedAt || '').getTime() - new Date(a.submittedAt || '').getTime());
   }, [userWorkHours, activityFilter, statusFilter, dateRange]);
@@ -124,7 +124,7 @@ const ExportPage = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     const fileName = `工时记录_${formatDate(new Date().toISOString())}.csv`;
-    
+
     link.href = url;
     link.download = fileName;
     document.body.appendChild(link);
@@ -189,7 +189,7 @@ const ExportPage = () => {
               <Search size={18} className="text-primary-600" />
               筛选条件
             </h3>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -282,7 +282,7 @@ const ExportPage = () => {
                 </span>
               </h3>
             </div>
-            
+
             {filteredWorkHours.length === 0 ? (
               <div className="text-center py-12">
                 <FileDown className="mx-auto text-slate-300 mb-3" size={48} />
@@ -401,7 +401,7 @@ const ExportPage = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
           onClick={() => setShowHistory(false)}
         >
-          <div 
+          <div
             className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
@@ -417,7 +417,7 @@ const ExportPage = () => {
                 ✕
               </button>
             </div>
-            
+
             <div className="p-5 overflow-y-auto max-h-[60vh] scrollbar-thin">
               {exportHistory.length === 0 ? (
                 <div className="text-center py-12">
