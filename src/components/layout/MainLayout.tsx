@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, User, FileDown, Settings, LogIn, ChevronDown } from 'lucide-react';
+import { Home, User, FileDown, Settings, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { useUserStore } from '../../store/useUserStore';
 

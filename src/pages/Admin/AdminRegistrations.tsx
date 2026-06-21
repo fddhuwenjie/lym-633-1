@@ -6,9 +6,9 @@ import { useUserStore } from '../../store/useUserStore';
 import { formatDateTime } from '../../utils/date';
 
 const AdminRegistrations = () => {
-  const { registrations, confirmRegistration, getRegistrationById, cancelRegistration } = useRegistrationStore();
-  const { activities, getActivityById, positions, getPositionById } = useActivityStore();
-  const { users, getUserById } = useUserStore();
+  const { registrations, confirmRegistration, cancelRegistration } = useRegistrationStore();
+  const { getActivityById, getPositionById, activities } = useActivityStore();
+  const { getUserById } = useUserStore();
   
   const [activityFilter, setActivityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');

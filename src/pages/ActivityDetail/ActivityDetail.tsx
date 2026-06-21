@@ -23,7 +23,6 @@ const ActivityDetail = () => {
     cancelRegistration, 
     hasUserRegistered, 
     getRegistrationsByActivityId,
-    getRegistrationById,
     confirmRegistration,
     registrations,
     getConfirmedCountByPosition,

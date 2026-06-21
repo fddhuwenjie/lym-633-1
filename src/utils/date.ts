@@ -1,4 +1,4 @@
-import { format, parseISO, differenceInHours, differenceInMinutes, isAfter, isBefore, isEqual } from 'date-fns';
+import { format, parseISO, differenceInMinutes, isAfter, isBefore, isEqual } from 'date-fns';
 import { zhCN } from 'date-fns/locale/zh-CN';
 
 export function formatDateTime(dateStr: string): string {

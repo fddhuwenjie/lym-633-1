@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { 
   Calendar, Users, Clock, Award, 
-  TrendingUp, UserCheck, UserX, FileText
+  TrendingUp, UserCheck, FileText
 } from 'lucide-react';
 import { useActivityStore } from '../../store/useActivityStore';
 import { useRegistrationStore } from '../../store/useRegistrationStore';
@@ -43,6 +43,7 @@ const AdminDashboard = () => {
       totalCertificates,
       totalVolunteers
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activities, positions, registrations, workHours, certificates, users]);
 
   const recentActivities = [...activities]

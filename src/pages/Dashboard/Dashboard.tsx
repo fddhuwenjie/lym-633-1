@@ -5,7 +5,7 @@ import ActivityCard from '../../components/features/ActivityCard';
 import { ActivityStatus } from '../../types';
 
 const Dashboard = () => {
-  const { activities, positions, getPositionsByActivityId } = useActivityStore();
+  const { activities, getPositionsByActivityId } = useActivityStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ActivityStatus | 'all'>('all');
 

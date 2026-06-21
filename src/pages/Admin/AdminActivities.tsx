@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Edit, Trash2, Eye, Calendar, Users } from 'lucide-react';
+import { Plus, Edit, Eye, Calendar, Users } from 'lucide-react';
 import { useActivityStore } from '../../store/useActivityStore';
 import { useRegistrationStore } from '../../store/useRegistrationStore';
 import { formatDate } from '../../utils/date';
@@ -8,8 +8,8 @@ import { ActivityStatus } from '../../types';
 
 const AdminActivities = () => {
   const navigate = useNavigate();
-  const { activities, positions, updateActivityStatus, deletePosition } = useActivityStore();
-  const { getRegistrationsByActivityId, registrations } = useRegistrationStore();
+  const { activities, positions, updateActivityStatus } = useActivityStore();
+  const { getRegistrationsByActivityId } = useRegistrationStore();
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const filteredActivities = activities.filter(a => {
@@ -19,17 +19,6 @@ const AdminActivities = () => {
 
   const handleStatusChange = (id: string, newStatus: ActivityStatus) => {
     updateActivityStatus(id, newStatus);
-  };
-
-  const statusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'draft': return 'bg-slate-100 text-slate-600';
-      case 'recruiting': return 'bg-green-100 text-green-700';
-      case 'ongoing': return 'bg-blue-100 text-blue-700';
-      case 'ended': return 'bg-slate-100 text-slate-500';
-      case 'cancelled': return 'bg-red-100 text-red-600';
-      default: return 'bg-slate-100 text-slate-600';
-    }
   };
 
   const statusLabel = (status: string) => {

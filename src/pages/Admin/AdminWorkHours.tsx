@@ -9,8 +9,8 @@ import { validateSelfReview } from '../../utils/validator';
 
 const AdminWorkHours = () => {
   const { workHours, approveWorkHour, rejectWorkHour, getWorkHourById } = useWorkHourStore();
-  const { activities, getActivityById } = useActivityStore();
-  const { users, getCurrentUser, getUserById } = useUserStore();
+  const { getActivityById } = useActivityStore();
+  const { getCurrentUser, getUserById } = useUserStore();
   const { generateCertificate } = useCertificateStore();
   
   const [statusFilter, setStatusFilter] = useState<string>('all');

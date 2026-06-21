@@ -40,6 +40,7 @@ function App() {
     loadCertificates();
     loadExportHistory();
     setIsLoaded(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!isLoaded) {

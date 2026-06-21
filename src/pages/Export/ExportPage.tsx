@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { FileDown, Download, History, Calendar, Search } from 'lucide-react';
+import { FileDown, Download, History, Search } from 'lucide-react';
 import Papa from 'papaparse';
 import { useUserStore } from '../../store/useUserStore';
 import { useWorkHourStore } from '../../store/useWorkHourStore';
@@ -10,11 +10,11 @@ import { useExportStore } from '../../store/useExportStore';
 import { formatDate, formatDateTime } from '../../utils/date';
 
 const ExportPage = () => {
-  const { getCurrentUser, users } = useUserStore();
+  const { getCurrentUser } = useUserStore();
   const { getWorkHoursByUserId, workHours } = useWorkHourStore();
-  const { certificates, getCertificateByWorkHourId } = useCertificateStore();
-  const { activities, getActivityById } = useActivityStore();
-  const { getRegistrationById, registrations } = useRegistrationStore();
+  const { getCertificateByWorkHourId } = useCertificateStore();
+  const { getActivityById, activities } = useActivityStore();
+  const { getRegistrationById } = useRegistrationStore();
   const { addExportRecord, getExportHistoryByUserId } = useExportStore();
 
   const [activityFilter, setActivityFilter] = useState<string>('all');
@@ -27,6 +27,7 @@ const ExportPage = () => {
   const userWorkHours = useMemo(() => {
     if (!currentUser) return [];
     return getWorkHoursByUserId(currentUser.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, workHours]);
 
   const userActivities = useMemo(() => {

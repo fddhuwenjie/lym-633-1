@@ -70,7 +70,7 @@ export const useRegistrationStore = create<RegistrationStore>((set, get) => ({
     
     const isFull = position ? confirmedCount >= position.totalQuota : false;
     
-    let status: RegistrationStatus = isFull ? 'waitlist' : 'pending';
+    const status: RegistrationStatus = isFull ? 'waitlist' : 'pending';
     let waitlistOrder: number | null = null;
     
     if (isFull) {
@@ -172,7 +172,7 @@ export const useRegistrationStore = create<RegistrationStore>((set, get) => ({
       confirmedTime: new Date().toISOString()
     };
 
-    let newRegistrations = get().registrations.map(r => {
+    const newRegistrations = get().registrations.map(r => {
       if (r.id === firstWaitlist.id) return updated;
       if (r.positionId === positionId && r.status === 'waitlist' && r.waitlistOrder && firstWaitlist.waitlistOrder && r.waitlistOrder > firstWaitlist.waitlistOrder) {
         return { ...r, waitlistOrder: r.waitlistOrder - 1 };

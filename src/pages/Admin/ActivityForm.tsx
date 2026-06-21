@@ -54,6 +54,7 @@ const ActivityForm = () => {
         requirements: p.requirements as unknown as string[]
       })));
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, id]);
 
   const managers = users.filter(u => u.role === 'manager' || u.role === 'organizer');
@@ -281,7 +282,7 @@ const ActivityForm = () => {
             </div>
 
             <div className="space-y-3 mb-4">
-              {positions.map((pos, idx) => (
+              {positions.map((pos) => (
                 <div key={pos.id} className="p-4 bg-slate-50 rounded-xl flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">

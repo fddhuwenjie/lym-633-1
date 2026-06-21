@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { 
-  Clock, Award, Calendar, User, FileText, 
+  Clock, Award, Calendar, 
   ChevronRight, Award as AwardIcon
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -18,16 +18,16 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState<TabType>('registrations');
   
   const { getCurrentUser, users } = useUserStore();
-  const { getRegistrationsByUserId, registrations } = useRegistrationStore();
-  const { getWorkHoursByUserId, getTotalApprovedHours, workHours } = useWorkHourStore();
-  const { getCertificatesByUserId, certificates } = useCertificateStore();
-  const { activities, positions, getActivityById, getPositionById } = useActivityStore();
+  const { getRegistrationsByUserId } = useRegistrationStore();
+  const { getWorkHoursByUserId, getTotalApprovedHours } = useWorkHourStore();
+  const { getCertificatesByUserId } = useCertificateStore();
+  const { getActivityById, getPositionById } = useActivityStore();
 
   const currentUser = getCurrentUser();
 
-  const userRegistrations = currentUser ? getRegistrationsByUserId(currentUser.id) : [];
-  const userWorkHours = currentUser ? getWorkHoursByUserId(currentUser.id) : [];
-  const userCertificates = currentUser ? getCertificatesByUserId(currentUser.id) : [];
+  const userRegistrations = useMemo(() => currentUser ? getRegistrationsByUserId(currentUser.id) : [], [currentUser, getRegistrationsByUserId]);
+  const userWorkHours = useMemo(() => currentUser ? getWorkHoursByUserId(currentUser.id) : [], [currentUser, getWorkHoursByUserId]);
+  const userCertificates = useMemo(() => currentUser ? getCertificatesByUserId(currentUser.id) : [], [currentUser, getCertificatesByUserId]);
   const totalApprovedHours = currentUser ? getTotalApprovedHours(currentUser.id) : 0;
 
   const monthlyStats = useMemo(() => {

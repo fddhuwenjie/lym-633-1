@@ -1,14 +1,14 @@
 import { useState, useMemo } from 'react';
-import { Award, RotateCcw, Search, FileText, X } from 'lucide-react';
+import { Award, RotateCcw, Search, X } from 'lucide-react';
 import { useCertificateStore } from '../../store/useCertificateStore';
 import { useActivityStore } from '../../store/useActivityStore';
 import { useUserStore } from '../../store/useUserStore';
-import { formatDateTime, formatDate } from '../../utils/date';
+import { formatDate } from '../../utils/date';
 
 const AdminCertificates = () => {
   const { certificates, revokeCertificate, getCertificateById } = useCertificateStore();
-  const { activities, getActivityById } = useActivityStore();
-  const { users, getUserById } = useUserStore();
+  const { getActivityById } = useActivityStore();
+  const { getUserById } = useUserStore();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -31,6 +31,7 @@ const AdminCertificates = () => {
       
       return true;
     }).sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [certificates, searchTerm, statusFilter]);
 
   const handleRevoke = (certId: string) => {
