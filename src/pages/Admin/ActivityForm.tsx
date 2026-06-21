@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Clock } from 'lucide-react';
 import { useActivityStore } from '../../store/useActivityStore';
 import { useUserStore } from '../../store/useUserStore';
-import { Position, ActivityStatus } from '../../types';
+import { Position, ActivityStatus, TimeSlot } from '../../types';
 import { generateId } from '../../utils/idGenerator';
 
 const ActivityForm = () => {
@@ -11,7 +11,7 @@ const ActivityForm = () => {
   const navigate = useNavigate();
   const isEdit = !!id;
 
-  const { getActivityById, getPositionsByActivityId, addActivity, updateActivity, addPosition, updatePosition, deletePosition } = useActivityStore();
+  const { getActivityById, getPositionsByActivityId, addActivity, updateActivity, addPosition, updatePosition, deletePosition, getTimeSlotsByPositionId, addTimeSlot, deleteTimeSlot, updateTimeSlot, getTimeSlotsByActivityId } = useActivityStore();
   const { users } = useUserStore();
 
   const [formData, setFormData] = useState({
@@ -33,6 +33,9 @@ const ActivityForm = () => {
     responsibleId: ''
   });
 
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [newTimeSlot, setNewTimeSlot] = useState<Record<string, { startTime: string; endTime: string; quota: number }>>({});
+
   useEffect(() => {
     if (isEdit && id) {
       const activity = getActivityById(id);
@@ -53,6 +56,9 @@ const ActivityForm = () => {
         ...p,
         requirements: p.requirements as unknown as string[]
       })));
+
+      const activityTimeSlots = getTimeSlotsByActivityId(id);
+      setTimeSlots(activityTimeSlots);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, id]);
@@ -93,6 +99,63 @@ const ActivityForm = () => {
 
   const handleRemovePosition = (posId: string) => {
     setPositions(positions.filter(p => p.id !== posId));
+    setTimeSlots(timeSlots.filter(ts => ts.positionId !== posId));
+  };
+
+  const getPositionTimeSlots = (positionId: string) => {
+    return timeSlots.filter(ts => ts.positionId === positionId);
+  };
+
+  const initNewTimeSlot = (positionId: string) => {
+    if (!newTimeSlot[positionId]) {
+      setNewTimeSlot(prev => ({
+        ...prev,
+        [positionId]: {
+          startTime: '',
+          endTime: '',
+          quota: 1
+        }
+      }));
+    }
+  };
+
+  const handleNewTimeSlotChange = (positionId: string, field: string, value: string | number) => {
+    setNewTimeSlot(prev => ({
+      ...prev,
+      [positionId]: {
+        ...prev[positionId],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleAddTimeSlot = (positionId: string) => {
+    initNewTimeSlot(positionId);
+    const slotData = newTimeSlot[positionId] || { startTime: '', endTime: '', quota: 1 };
+    if (!slotData.startTime || !slotData.endTime) return;
+
+    const slot: TimeSlot = {
+      id: generateId(),
+      positionId,
+      activityId: id || '',
+      startTime: slotData.startTime,
+      endTime: slotData.endTime,
+      quota: slotData.quota
+    };
+
+    setTimeSlots([...timeSlots, slot]);
+    setNewTimeSlot(prev => ({
+      ...prev,
+      [positionId]: {
+        startTime: '',
+        endTime: '',
+        quota: 1
+      }
+    }));
+  };
+
+  const handleRemoveTimeSlot = (slotId: string) => {
+    setTimeSlots(timeSlots.filter(ts => ts.id !== slotId));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -124,6 +187,25 @@ const ActivityForm = () => {
         }
       });
 
+      const existingTimeSlots = getTimeSlotsByActivityId(id);
+      const positionIds = positions.map(p => p.id);
+      const currentTimeSlots = timeSlots.filter(ts => positionIds.includes(ts.positionId));
+
+      currentTimeSlots.forEach(ts => {
+        const exists = existingTimeSlots.find(ets => ets.id === ts.id);
+        if (exists) {
+          updateTimeSlot(ts.id, { ...ts, activityId: id });
+        } else {
+          addTimeSlot({ ...ts, activityId: id });
+        }
+      });
+
+      existingTimeSlots.forEach(ets => {
+        if (!currentTimeSlots.find(ts => ts.id === ets.id)) {
+          deleteTimeSlot(ets.id);
+        }
+      });
+
     } else {
       const newActivity = addActivity({
         ...formData,
@@ -133,7 +215,15 @@ const ActivityForm = () => {
       });
 
       positions.forEach(pos => {
-        addPosition({ ...pos, activityId: newActivity.id });
+        const savedPosition = addPosition({ ...pos, activityId: newActivity.id });
+        const posTimeSlots = timeSlots.filter(ts => ts.positionId === pos.id);
+        posTimeSlots.forEach(ts => {
+          addTimeSlot({
+            ...ts,
+            positionId: savedPosition.id,
+            activityId: newActivity.id
+          });
+        });
       });
     }
 
@@ -282,35 +372,113 @@ const ActivityForm = () => {
             </div>
 
             <div className="space-y-3 mb-4">
-              {positions.map((pos) => (
-                <div key={pos.id} className="p-4 bg-slate-50 rounded-xl flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="font-medium text-slate-800">{pos.name}</span>
-                      <span className="badge badge-primary">{pos.totalQuota} 人</span>
-                    </div>
-                    {pos.description && (
-                      <p className="text-sm text-slate-600 mb-2">{pos.description}</p>
-                    )}
-                    {pos.requirements && pos.requirements.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {pos.requirements.map(req => (
-                          <span key={req} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-white border border-slate-200 text-slate-600">
-                            {req}
-                          </span>
-                        ))}
+              {positions.map((pos) => {
+                initNewTimeSlot(pos.id);
+                const posTimeSlots = getPositionTimeSlots(pos.id);
+                const slotData = newTimeSlot[pos.id] || { startTime: '', endTime: '', quota: 1 };
+                return (
+                  <div key={pos.id} className="p-4 bg-slate-50 rounded-xl">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="font-medium text-slate-800">{pos.name}</span>
+                          <span className="badge badge-primary">{pos.totalQuota} 人</span>
+                        </div>
+                        {pos.description && (
+                          <p className="text-sm text-slate-600 mb-2">{pos.description}</p>
+                        )}
+                        {pos.requirements && pos.requirements.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {pos.requirements.map(req => (
+                              <span key={req} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-white border border-slate-200 text-slate-600">
+                                {req}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePosition(pos.id)}
+                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-200">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Clock size={16} className="text-slate-500" />
+                        <span className="text-sm font-medium text-slate-700">排班时段</span>
+                        <span className="text-xs text-slate-400">({posTimeSlots.length} 个时段)</span>
+                      </div>
+
+                      {posTimeSlots.length > 0 && (
+                        <div className="space-y-2 mb-3">
+                          {posTimeSlots.map(ts => (
+                            <div key={ts.id} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200">
+                              <div className="flex-1 flex items-center gap-2 text-sm">
+                                <span className="text-slate-700">{ts.startTime.slice(11, 16)}</span>
+                                <span className="text-slate-400">—</span>
+                                <span className="text-slate-700">{ts.endTime.slice(11, 16)}</span>
+                                <span className="badge badge-secondary ml-2">{ts.quota} 人</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveTimeSlot(ts.id)}
+                                className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="p-3 border border-dashed border-slate-300 rounded-lg">
+                        <div className="grid grid-cols-3 gap-2 mb-2">
+                          <div>
+                            <label className="block text-xs text-slate-500 mb-1">开始时间</label>
+                            <input
+                              type="datetime-local"
+                              value={slotData.startTime}
+                              onChange={e => handleNewTimeSlotChange(pos.id, 'startTime', e.target.value)}
+                              className="input-field text-sm py-1.5"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-500 mb-1">结束时间</label>
+                            <input
+                              type="datetime-local"
+                              value={slotData.endTime}
+                              onChange={e => handleNewTimeSlotChange(pos.id, 'endTime', e.target.value)}
+                              className="input-field text-sm py-1.5"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-500 mb-1">配额</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={slotData.quota}
+                              onChange={e => handleNewTimeSlotChange(pos.id, 'quota', parseInt(e.target.value) || 1)}
+                              className="input-field text-sm py-1.5"
+                            />
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAddTimeSlot(pos.id)}
+                          className="btn-secondary text-xs flex items-center gap-1 py-1.5"
+                        >
+                          <Plus size={14} />
+                          添加时段
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemovePosition(pos.id)}
-                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl space-y-3">

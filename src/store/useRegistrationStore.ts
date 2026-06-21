@@ -1,9 +1,15 @@
 import { create } from 'zustand';
-import { Registration, RegistrationStatus } from '../types';
+import { Registration, RegistrationStatus, TimeSlot } from '../types';
 import { getStorageItem, setStorageItem } from '../utils/storage';
 import { mockRegistrations } from '../data/mockData';
 import { generateId } from '../utils/idGenerator';
 import { useActivityStore } from './useActivityStore';
+import { isTimeOverlap } from '../utils/date';
+
+interface TimeSlotConflict {
+  hasConflict: boolean;
+  conflictingSlots: { slot: TimeSlot; activityTitle: string; positionName: string }[];
+}
 
 interface RegistrationStore {
   registrations: Registration[];
@@ -14,12 +20,16 @@ interface RegistrationStore {
   getRegistrationById: (id: string) => Registration | undefined;
   getConfirmedCountByPosition: (positionId: string) => number;
   getWaitlistCountByPosition: (positionId: string) => number;
-  addRegistration: (data: Omit<Registration, 'id' | 'signUpTime' | 'confirmedTime' | 'waitlistOrder' | 'status'>) => Registration;
+  addRegistration: (data: Omit<Registration, 'id' | 'signUpTime' | 'confirmedTime' | 'waitlistOrder' | 'status' | 'selectedTimeSlotIds'> & { selectedTimeSlotIds?: string[] }) => Registration;
   updateRegistrationStatus: (id: string, status: RegistrationStatus) => void;
   confirmRegistration: (id: string) => void;
   cancelRegistration: (id: string) => void;
   promoteFromWaitlist: (positionId: string) => Registration | null;
   hasUserRegistered: (userId: string, activityId: string) => boolean;
+  updateSelectedTimeSlots: (registrationId: string, timeSlotIds: string[]) => void;
+  checkTimeSlotConflicts: (userId: string, excludeRegistrationId?: string) => (slotIds: string[]) => TimeSlotConflict;
+  getConfirmedSlotsByUserId: (userId: string) => TimeSlot[];
+  getSlotConfirmedCount: (timeSlotId: string) => number;
 }
 
 export const useRegistrationStore = create<RegistrationStore>((set, get) => ({
@@ -31,7 +41,12 @@ export const useRegistrationStore = create<RegistrationStore>((set, get) => ({
       set({ registrations: mockRegistrations });
       setStorageItem('registrations', mockRegistrations);
     } else {
-      set({ registrations: stored });
+      const updated = stored.map(r => ({
+        ...r,
+        selectedTimeSlotIds: r.selectedTimeSlotIds || []
+      }));
+      set({ registrations: updated });
+      setStorageItem('registrations', updated);
     }
   },
 
@@ -63,6 +78,58 @@ export const useRegistrationStore = create<RegistrationStore>((set, get) => ({
     ).length;
   },
 
+  getSlotConfirmedCount: (timeSlotId) => {
+    return get().registrations.filter(
+      r => r.status === 'confirmed' && r.selectedTimeSlotIds.includes(timeSlotId)
+    ).length;
+  },
+
+  getConfirmedSlotsByUserId: (userId) => {
+    const { getTimeSlotsByIds } = useActivityStore.getState();
+    const userRegs = get().registrations.filter(
+      r => r.userId === userId && r.status === 'confirmed'
+    );
+    const allSlotIds = userRegs.flatMap(r => r.selectedTimeSlotIds);
+    return getTimeSlotsByIds(allSlotIds);
+  },
+
+  checkTimeSlotConflicts: (userId, excludeRegistrationId) => (slotIds) => {
+    const { getTimeSlotById, getActivityById, getPositionById } = useActivityStore.getState();
+    const confirmedSlots = get().getConfirmedSlotsByUserId(userId).filter(
+      s => {
+        if (!excludeRegistrationId) return true;
+        const reg = get().registrations.find(
+          r => r.userId === userId && r.status === 'confirmed' && r.selectedTimeSlotIds.includes(s.id)
+        );
+        return reg?.id !== excludeRegistrationId;
+      }
+    );
+    
+    const conflictingSlots: { slot: TimeSlot; activityTitle: string; positionName: string }[] = [];
+    const newSlots = slotIds.map(id => getTimeSlotById(id)).filter(Boolean) as TimeSlot[];
+
+    newSlots.forEach(newSlot => {
+      confirmedSlots.forEach(existingSlot => {
+        if (isTimeOverlap(newSlot.startTime, newSlot.endTime, existingSlot.startTime, existingSlot.endTime)) {
+          const activity = getActivityById(existingSlot.activityId);
+          const position = getPositionById(existingSlot.positionId);
+          if (!conflictingSlots.find(c => c.slot.id === existingSlot.id)) {
+            conflictingSlots.push({
+              slot: existingSlot,
+              activityTitle: activity?.title || '未知活动',
+              positionName: position?.name || '未知岗位'
+            });
+          }
+        }
+      });
+    });
+
+    return {
+      hasConflict: conflictingSlots.length > 0,
+      conflictingSlots
+    };
+  },
+
   addRegistration: (data) => {
     const { positions } = useActivityStore.getState();
     const position = positions.find(p => p.id === data.positionId);
@@ -84,7 +151,8 @@ export const useRegistrationStore = create<RegistrationStore>((set, get) => ({
       status,
       waitlistOrder,
       signUpTime: new Date().toISOString(),
-      confirmedTime: null
+      confirmedTime: null,
+      selectedTimeSlotIds: data.selectedTimeSlotIds || []
     };
 
     const newRegistrations = [...get().registrations, newRegistration];
@@ -96,6 +164,14 @@ export const useRegistrationStore = create<RegistrationStore>((set, get) => ({
   updateRegistrationStatus: (id, status) => {
     const newRegistrations = get().registrations.map(r =>
       r.id === id ? { ...r, status } : r
+    );
+    set({ registrations: newRegistrations });
+    setStorageItem('registrations', newRegistrations);
+  },
+
+  updateSelectedTimeSlots: (registrationId, timeSlotIds) => {
+    const newRegistrations = get().registrations.map(r =>
+      r.id === registrationId ? { ...r, selectedTimeSlotIds: timeSlotIds } : r
     );
     set({ registrations: newRegistrations });
     setStorageItem('registrations', newRegistrations);
@@ -119,7 +195,7 @@ export const useRegistrationStore = create<RegistrationStore>((set, get) => ({
     if (!registration) return;
 
     let newRegistrations = get().registrations.map(r =>
-      r.id === id ? { ...r, status: 'cancelled' as RegistrationStatus, waitlistOrder: null } : r
+      r.id === id ? { ...r, status: 'cancelled' as RegistrationStatus, waitlistOrder: null, selectedTimeSlotIds: [] } : r
     );
 
     if (registration.status === 'confirmed') {

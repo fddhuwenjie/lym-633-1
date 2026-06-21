@@ -6,6 +6,7 @@ export interface WorkHour {
   userId: string;
   activityId: string;
   hours: number;
+  suggestedHours: number | null;
   status: WorkHourStatus;
   reviewerId: string | null;
   rejectReason: string | null;

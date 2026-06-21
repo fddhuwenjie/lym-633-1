@@ -14,6 +14,15 @@ export interface Activity {
   updatedAt: string;
 }
 
+export interface TimeSlot {
+  id: string;
+  positionId: string;
+  activityId: string;
+  startTime: string;
+  endTime: string;
+  quota: number;
+}
+
 export interface Position {
   id: string;
   activityId: string;

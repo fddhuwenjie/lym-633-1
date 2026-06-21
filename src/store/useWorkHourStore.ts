@@ -4,6 +4,7 @@ import { getStorageItem, setStorageItem } from '../utils/storage';
 import { mockWorkHours } from '../data/mockData';
 import { generateId } from '../utils/idGenerator';
 import { useCertificateStore } from './useCertificateStore';
+import { useServiceQualityStore } from './useServiceQualityStore';
 
 interface WorkHourStore {
   workHours: WorkHour[];
@@ -13,13 +14,15 @@ interface WorkHourStore {
   getWorkHourById: (id: string) => WorkHour | undefined;
   getWorkHourByRegistrationId: (registrationId: string) => WorkHour | undefined;
   getPendingWorkHours: () => WorkHour[];
-  addWorkHour: (data: Omit<WorkHour, 'id' | 'status' | 'submittedAt' | 'reviewedAt' | 'reviewerId' | 'rejectReason'>) => WorkHour;
-  submitWorkHour: (id: string) => void;
+  addWorkHour: (data: Omit<WorkHour, 'id' | 'status' | 'submittedAt' | 'reviewedAt' | 'reviewerId' | 'rejectReason' | 'suggestedHours'>) => WorkHour;
+  submitWorkHour: (id: string) => { success: boolean; reason?: string };
   resubmitWorkHour: (id: string) => void;
   approveWorkHour: (id: string, reviewerId: string) => void;
   rejectWorkHour: (id: string, reviewerId: string, reason: string) => void;
   updateWorkHour: (id: string, updates: Partial<WorkHour>) => void;
   getTotalApprovedHours: (userId: string) => number;
+  canSubmitWorkHour: (registrationId: string) => { canSubmit: boolean; reason?: string };
+  refreshSuggestedHours: (registrationId: string) => void;
 }
 
 export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
@@ -33,7 +36,10 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
     } else {
       const hasWh003 = stored.some(w => w.id === 'wh-003');
       const hasWh004 = stored.some(w => w.id === 'wh-004');
-      const merged = [...stored];
+      const merged = stored.map(w => ({
+        ...w,
+        suggestedHours: w.suggestedHours ?? null
+      }));
       if (!hasWh003) {
         const wh003 = mockWorkHours.find(w => w.id === 'wh-003');
         if (wh003) merged.push(wh003);
@@ -42,7 +48,7 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
         const wh004 = mockWorkHours.find(w => w.id === 'wh-004');
         if (wh004) merged.push(wh004);
       }
-      if (merged.length !== stored.length) {
+      if (merged.length !== stored.length || merged.some((w, i) => w.suggestedHours !== stored[i]?.suggestedHours)) {
         set({ workHours: merged });
         setStorageItem('workhours', merged);
       } else {
@@ -71,9 +77,31 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
     return get().workHours.filter(w => w.status === 'pending');
   },
 
+  canSubmitWorkHour: (registrationId) => {
+    const { hasAbsentRecord, calculateSuggestedHours } = useServiceQualityStore.getState();
+    
+    if (hasAbsentRecord(registrationId)) {
+      return { canSubmit: false, reason: '存在缺勤记录，不允许提交工时，请联系负责人' };
+    }
+    
+    return { canSubmit: true };
+  },
+
+  refreshSuggestedHours: (registrationId) => {
+    const { calculateSuggestedHours } = useServiceQualityStore.getState();
+    const suggested = calculateSuggestedHours(registrationId);
+    const workHour = get().getWorkHourByRegistrationId(registrationId);
+    if (workHour) {
+      get().updateWorkHour(workHour.id, { suggestedHours: suggested });
+    }
+  },
+
   addWorkHour: (data) => {
     const existing = get().getWorkHourByRegistrationId(data.registrationId);
     if (existing) return existing;
+
+    const { calculateSuggestedHours } = useServiceQualityStore.getState();
+    const suggestedHours = calculateSuggestedHours(data.registrationId);
 
     const newWorkHour: WorkHour = {
       ...data,
@@ -82,7 +110,8 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
       reviewerId: null,
       rejectReason: null,
       submittedAt: null,
-      reviewedAt: null
+      reviewedAt: null,
+      suggestedHours
     };
 
     const newWorkHours = [...get().workHours, newWorkHour];
@@ -92,18 +121,37 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
   },
 
   submitWorkHour: (id) => {
+    const workHour = get().getWorkHourById(id);
+    if (!workHour) return { success: false, reason: '工时记录不存在' };
+
+    const { hasAbsentRecord, calculateSuggestedHours } = useServiceQualityStore.getState();
+    
+    if (hasAbsentRecord(workHour.registrationId)) {
+      return { success: false, reason: '存在缺勤记录，不允许提交工时，请联系负责人' };
+    }
+
+    const suggestedHours = calculateSuggestedHours(workHour.registrationId);
+
     const newWorkHours = get().workHours.map(w =>
       w.id === id ? { 
         ...w, 
         status: 'pending' as WorkHourStatus,
-        submittedAt: new Date().toISOString()
+        submittedAt: new Date().toISOString(),
+        suggestedHours
       } : w
     );
     set({ workHours: newWorkHours });
     setStorageItem('workhours', newWorkHours);
+    return { success: true };
   },
 
   resubmitWorkHour: (id) => {
+    const workHour = get().getWorkHourById(id);
+    if (!workHour) return;
+
+    const { calculateSuggestedHours } = useServiceQualityStore.getState();
+    const suggestedHours = calculateSuggestedHours(workHour.registrationId);
+
     const newWorkHours = get().workHours.map(w =>
       w.id === id ? { 
         ...w, 
@@ -111,7 +159,8 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
         submittedAt: new Date().toISOString(),
         reviewedAt: null,
         reviewerId: null,
-        rejectReason: null
+        rejectReason: null,
+        suggestedHours
       } : w
     );
     set({ workHours: newWorkHours });
@@ -119,16 +168,31 @@ export const useWorkHourStore = create<WorkHourStore>((set, get) => ({
   },
 
   approveWorkHour: (id, reviewerId) => {
+    const workHour = get().getWorkHourById(id);
+    if (!workHour) return;
+
+    const { calculateSuggestedHours } = useServiceQualityStore.getState();
+    const suggestedHours = calculateSuggestedHours(workHour.registrationId);
+
     const newWorkHours = get().workHours.map(w =>
       w.id === id ? {
         ...w,
         status: 'approved' as WorkHourStatus,
         reviewerId,
-        reviewedAt: new Date().toISOString()
+        reviewedAt: new Date().toISOString(),
+        suggestedHours
       } : w
     );
     set({ workHours: newWorkHours });
     setStorageItem('workhours', newWorkHours);
+    
+    useCertificateStore.getState().generateCertificate(
+      workHour.id,
+      workHour.userId,
+      workHour.activityId,
+      workHour.hours,
+      reviewerId
+    );
   },
 
   rejectWorkHour: (id, reviewerId, reason) => {

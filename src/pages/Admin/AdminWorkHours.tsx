@@ -1,20 +1,40 @@
 import { useState, useMemo } from 'react';
-import { Clock, Check, X, AlertCircle, UserCheck } from 'lucide-react';
+import { Clock, Check, X, AlertCircle, UserCheck, AlertTriangle } from 'lucide-react';
 import { useWorkHourStore } from '../../store/useWorkHourStore';
 import { useActivityStore } from '../../store/useActivityStore';
 import { useUserStore } from '../../store/useUserStore';
 import { useCertificateStore } from '../../store/useCertificateStore';
-import { formatDateTime } from '../../utils/date';
+import { useServiceQualityStore } from '../../store/useServiceQualityStore';
+import { useRegistrationStore } from '../../store/useRegistrationStore';
+import { formatDateTime, formatTime } from '../../utils/date';
 import { validateSelfReview } from '../../utils/validator';
+import { ServiceQualityType, ServiceEvaluationRating } from '../../types';
+
+const qualityTypeMap: Record<ServiceQualityType, string> = {
+  late: '迟到',
+  early_leave: '早退',
+  absent: '缺勤',
+  normal: '正常'
+};
+
+const ratingMap: Record<ServiceEvaluationRating, string> = {
+  excellent: '优秀',
+  good: '良好',
+  average: '一般',
+  poor: '较差'
+};
 
 const AdminWorkHours = () => {
   const { workHours, approveWorkHour, rejectWorkHour, getWorkHourById } = useWorkHourStore();
-  const { getActivityById } = useActivityStore();
+  const { getActivityById, getTimeSlotsByIds } = useActivityStore();
   const { getCurrentUser, getUserById } = useUserStore();
   const { generateCertificate } = useCertificateStore();
+  const { getRecordsByRegistrationId, hasAbsentRecord } = useServiceQualityStore();
+  const { getRegistrationById } = useRegistrationStore();
   
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
+  const [showAbsentConfirmModal, setShowAbsentConfirmModal] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
   const currentUser = getCurrentUser();
@@ -30,7 +50,7 @@ const AdminWorkHours = () => {
     });
   }, [workHours, statusFilter]);
 
-  const handleApprove = (whId: string) => {
+  const doApprove = (whId: string) => {
     const workHour = getWorkHourById(whId);
     if (!workHour || !currentUser) return;
 
@@ -48,6 +68,25 @@ const AdminWorkHours = () => {
       workHour.hours,
       currentUser.id
     );
+  };
+
+  const handleApprove = (whId: string) => {
+    const workHour = getWorkHourById(whId);
+    if (!workHour) return;
+
+    if (hasAbsentRecord(workHour.registrationId)) {
+      setShowAbsentConfirmModal(whId);
+      return;
+    }
+
+    doApprove(whId);
+  };
+
+  const handleConfirmAbsentApprove = () => {
+    if (showAbsentConfirmModal) {
+      doApprove(showAbsentConfirmModal);
+      setShowAbsentConfirmModal(null);
+    }
   };
 
   const handleReject = (whId: string) => {
@@ -101,6 +140,100 @@ const AdminWorkHours = () => {
     totalHours: workHours.filter(w => w.status === 'approved').reduce((sum, w) => sum + w.hours, 0)
   };
 
+  const renderTimeSlots = (registrationId: string) => {
+    const registration = getRegistrationById(registrationId);
+    if (!registration || registration.selectedTimeSlotIds.length === 0) {
+      return <span className="text-slate-400">-</span>;
+    }
+    const slots = getTimeSlotsByIds(registration.selectedTimeSlotIds);
+    if (slots.length === 0) {
+      return <span className="text-slate-400">-</span>;
+    }
+    return (
+      <div className="space-y-1">
+        {slots.map(slot => (
+          <div key={slot.id} className="text-xs text-slate-600">
+            {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderQualityTypes = (registrationId: string) => {
+    const records = getRecordsByRegistrationId(registrationId);
+    if (records.length === 0) {
+      return <span className="text-slate-400">-</span>;
+    }
+    const types = [...new Set(records.map(r => r.qualityType))];
+    return (
+      <div className="flex flex-wrap gap-1">
+        {types.map(type => (
+          <span
+            key={type}
+            className={`text-xs px-2 py-0.5 rounded-full ${
+              type === 'absent'
+                ? 'bg-red-100 text-red-600'
+                : type === 'normal'
+                ? 'bg-green-100 text-green-600'
+                : 'bg-amber-100 text-amber-600'
+            }`}
+          >
+            {qualityTypeMap[type]}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
+  const renderRating = (registrationId: string) => {
+    const records = getRecordsByRegistrationId(registrationId);
+    const ratings = records.filter(r => r.rating).map(r => r.rating as ServiceEvaluationRating);
+    if (ratings.length === 0) {
+      return <span className="text-slate-400">-</span>;
+    }
+    const firstRating = ratings[0];
+    const ratingColors: Record<ServiceEvaluationRating, string> = {
+      excellent: 'text-green-600 bg-green-50',
+      good: 'text-blue-600 bg-blue-50',
+      average: 'text-amber-600 bg-amber-50',
+      poor: 'text-red-600 bg-red-50'
+    };
+    return (
+      <span className={`text-xs px-2 py-0.5 rounded-full ${ratingColors[firstRating]}`}>
+        {ratingMap[firstRating]}
+      </span>
+    );
+  };
+
+  const renderHoursWithWarning = (workHour: { hours: number; suggestedHours: number | null }) => {
+    const { hours, suggestedHours } = workHour;
+    const showWarning = suggestedHours !== null && Math.abs(hours - suggestedHours) >= 1;
+
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center gap-1">
+          <span className="font-semibold text-primary-600">{hours}</span>
+          <span className="text-sm text-slate-500">小时</span>
+        </div>
+        {suggestedHours !== null && (
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-slate-400">建议 {suggestedHours}h</span>
+            {showWarning && (
+              <AlertTriangle size={14} className="text-amber-500" />
+            )}
+          </div>
+        )}
+        {showWarning && (
+          <p className="text-xs text-amber-600 flex items-center gap-1">
+            <AlertTriangle size={12} />
+            与建议时长差异较大
+          </p>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -152,7 +285,10 @@ const AdminWorkHours = () => {
               <tr>
                 <th>志愿者</th>
                 <th>活动</th>
+                <th>排班时段</th>
                 <th>申报时长</th>
+                <th>异常类型</th>
+                <th>评价等级</th>
                 <th>提交时间</th>
                 <th>状态</th>
                 <th>审核人</th>
@@ -184,9 +320,17 @@ const AdminWorkHours = () => {
                     <td className="text-slate-700 text-sm max-w-[200px] truncate">
                       {activity?.title}
                     </td>
+                    <td className="text-sm">
+                      {renderTimeSlots(wh.registrationId)}
+                    </td>
                     <td>
-                      <span className="font-semibold text-primary-600">{wh.hours}</span>
-                      <span className="text-sm text-slate-500 ml-1">小时</span>
+                      {renderHoursWithWarning(wh)}
+                    </td>
+                    <td>
+                      {renderQualityTypes(wh.registrationId)}
+                    </td>
+                    <td>
+                      {renderRating(wh.registrationId)}
                     </td>
                     <td className="text-sm text-slate-500">
                       {wh.submittedAt ? formatDateTime(wh.submittedAt) : '-'}
@@ -290,6 +434,42 @@ const AdminWorkHours = () => {
                 className="btn-danger"
               >
                 确认退回
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAbsentConfirmModal && (
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowAbsentConfirmModal(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+              <AlertTriangle className="text-amber-500" size={20} />
+              存在缺勤记录
+            </h3>
+            
+            <p className="text-sm text-slate-600 mb-6">
+              该工时记录关联的报名存在缺勤记录，确认要通过审核吗？
+            </p>
+            
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowAbsentConfirmModal(null)}
+                className="btn-secondary"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmAbsentApprove}
+                className="btn-primary"
+              >
+                确认通过
               </button>
             </div>
           </div>

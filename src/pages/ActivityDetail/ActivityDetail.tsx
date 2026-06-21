@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   MapPin, Clock, Users, ArrowLeft, Calendar, 
-  AlertCircle, CheckCircle, XCircle, Clock3
+  AlertCircle, CheckCircle, XCircle, Clock3,
+  CalendarClock, CheckSquare, Square
 } from 'lucide-react';
 import { useActivityStore } from '../../store/useActivityStore';
 import { useUserStore } from '../../store/useUserStore';
@@ -16,7 +17,7 @@ const ActivityDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   
-  const { getActivityById, getPositionsByActivityId, getPositionById, activities } = useActivityStore();
+  const { getActivityById, getPositionsByActivityId, getPositionById, activities, getTimeSlotsByPositionId } = useActivityStore();
   const { getCurrentUser, users } = useUserStore();
   const { 
     addRegistration, 
@@ -26,7 +27,10 @@ const ActivityDetail = () => {
     confirmRegistration,
     registrations,
     getConfirmedCountByPosition,
-    getWaitlistCountByPosition
+    getWaitlistCountByPosition,
+    updateSelectedTimeSlots,
+    checkTimeSlotConflicts,
+    getSlotConfirmedCount
   } = useRegistrationStore();
   const { 
     getCheckinByRegistrationId, 
@@ -35,7 +39,7 @@ const ActivityDetail = () => {
     createCheckin,
     calculateWorkHours
   } = useCheckinStore();
-  const { addWorkHour, submitWorkHour, getWorkHourByRegistrationId } = useWorkHourStore();
+  const { addWorkHour, submitWorkHour, getWorkHourByRegistrationId, canSubmitWorkHour } = useWorkHourStore();
   
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState<string | null>(null);
@@ -147,6 +151,12 @@ const ActivityDetail = () => {
     const checkin = getCheckinByRegistrationId(registrationId);
     if (!checkin || !checkin.checkinTime || !checkin.checkoutTime) return;
 
+    const { canSubmit, reason } = canSubmitWorkHour(registrationId);
+    if (!canSubmit) {
+      setErrorMessage(reason || '不允许提交工时');
+      return;
+    }
+
     const hours = calculateWorkHours(registrationId);
     const workHour = addWorkHour({
       registrationId,
@@ -158,6 +168,31 @@ const ActivityDetail = () => {
     submitWorkHour(workHour.id);
     setShowSuccess('工时已提交审核');
     setTimeout(() => setShowSuccess(null), 3000);
+  };
+
+  const handleToggleTimeSlot = (registrationId: string, slotId: string, currentSelected: string[]) => {
+    let newSelected: string[];
+    if (currentSelected.includes(slotId)) {
+      newSelected = currentSelected.filter(id => id !== slotId);
+    } else {
+      newSelected = [...currentSelected, slotId];
+    }
+    
+    if (!currentUser) return;
+    
+    const checkConflicts = checkTimeSlotConflicts(currentUser.id, registrationId);
+    const { hasConflict, conflictingSlots } = checkConflicts(newSelected);
+    
+    if (hasConflict && !currentSelected.includes(slotId)) {
+      const conflictInfo = conflictingSlots
+        .map(c => `「${c.activityTitle} - ${c.positionName}」${formatTime(c.slot.startTime)}-${formatTime(c.slot.endTime)}`)
+        .join('、');
+      setErrorMessage(`时段冲突：与${conflictInfo}时间重叠`);
+      setTimeout(() => setErrorMessage(null), 4000);
+      return;
+    }
+    
+    updateSelectedTimeSlots(registrationId, newSelected);
   };
 
   const handleConfirmRegistration = (regId: string) => {
@@ -281,6 +316,7 @@ const ActivityDetail = () => {
             const checkin = userReg ? getCheckinByRegistrationId(userReg.id) : null;
             const workHour = userReg ? getWorkHourByRegistrationId(userReg.id) : null;
             const responsible = users.find(u => u.id === position.responsibleId);
+            const timeSlots = getTimeSlotsByPositionId(position.id);
             
             const { valid: meetsRequirements } = currentUser 
               ? validatePositionRequirements(currentUser, position)
@@ -316,6 +352,78 @@ const ActivityDetail = () => {
                             </span>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {timeSlots.length > 0 && (
+                      <div className="mb-3">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <CalendarClock size={16} className="text-slate-600" />
+                          <p className="text-sm font-medium text-slate-700">排班时段：</p>
+                        </div>
+                        <div className="space-y-2">
+                          {timeSlots.map(slot => {
+                            const slotConfirmed = getSlotConfirmedCount(slot.id);
+                            const slotProgress = (slotConfirmed / slot.quota) * 100;
+                            const isSlotFull = slotConfirmed >= slot.quota;
+                            const isSlotSelected = userReg?.selectedTimeSlotIds?.includes(slot.id);
+                            const canSelectSlot = userReg?.status === 'confirmed';
+
+                            return (
+                              <div 
+                                key={slot.id}
+                                className={`border rounded-lg p-3 ${
+                                  canSelectSlot ? 'cursor-pointer hover:border-primary-300 hover:bg-primary-50' : ''
+                                } ${
+                                  isSlotSelected ? 'border-primary-500 bg-primary-50' : 'border-slate-200'
+                                }`}
+                                onClick={() => {
+                                  if (canSelectSlot && userReg) {
+                                    handleToggleTimeSlot(userReg.id, slot.id, userReg.selectedTimeSlotIds || []);
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center justify-between items-start gap-3">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      {canSelectSlot && (
+                                        isSlotSelected 
+                                          ? <CheckSquare size={18} className="text-primary-600 shrink-0" />
+                                          : <Square size={18} className="text-slate-400 shrink-0" />
+                                      )}
+                                      <span className="text-sm font-medium text-slate-800">
+                                        {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                                      </span>
+                                    </div>
+                                    <div className="mt-2">
+                                      <div className="flex items-center justify-between text-xs mb-1">
+                                      <span className="text-slate-500">
+                                          配额：{slotConfirmed}/{slot.quota} 人
+                                        </span>
+                                      </div>
+                                      <div className="progress-bar">
+                                        <div
+                                          className={`progress-fill ${isSlotFull ? 'bg-amber-500' : ''}`}
+                                          style={{ width: `${Math.min(slotProgress, 100)}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {isSlotFull && (
+                                    <span className="badge badge-warning text-xs">
+                                      已满
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {userReg?.status === 'confirmed' && (
+                          <p className="text-xs text-slate-500 mt-2">
+                            点击勾选您可服务的时段（可多选）
+                          </p>
+                        )}
                       </div>
                     )}
 
@@ -386,16 +494,23 @@ const ActivityDetail = () => {
                               </button>
                             )}
                             {workHour && (
-                              <div className={`badge w-full justify-center py-1.5 ${
-                                workHour.status === 'approved' ? 'badge-success' :
-                                workHour.status === 'pending' ? 'badge-warning' :
-                                workHour.status === 'rejected' ? 'badge-error' : 'badge-info'
-                              }`}>
-                                {workHour.status === 'approved' && '工时已确认'}
-                                {workHour.status === 'pending' && '工时审核中'}
-                                {workHour.status === 'rejected' && '工时已退回'}
-                                {workHour.status === 'draft' && '工时草稿'}
-                                {workHour.hours}小时
+                              <div className="space-y-2">
+                                <div className={`badge w-full justify-center py-1.5 ${
+                                  workHour.status === 'approved' ? 'badge-success' :
+                                  workHour.status === 'pending' ? 'badge-warning' :
+                                  workHour.status === 'rejected' ? 'badge-error' : 'badge-info'
+                                }`}>
+                                  {workHour.status === 'approved' && '工时已确认'}
+                                  {workHour.status === 'pending' && '工时审核中'}
+                                  {workHour.status === 'rejected' && '工时已退回'}
+                                  {workHour.status === 'draft' && '工时草稿'}
+                                  {workHour.hours}小时
+                                </div>
+                                {workHour.suggestedHours !== null && workHour.suggestedHours !== undefined && (
+                                  <div className="text-xs text-center text-slate-600 bg-slate-50 rounded-md py-1.5 px-2">
+                                    建议工时：{workHour.suggestedHours}小时
+                                  </div>
+                                )}
                               </div>
                             )}
                           </>

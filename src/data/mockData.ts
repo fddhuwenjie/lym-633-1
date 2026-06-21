@@ -1,4 +1,4 @@
-import { User, Activity, Position, Registration, CheckinRecord, WorkHour, Certificate } from '../types';
+import { User, Activity, Position, Registration, CheckinRecord, WorkHour, Certificate, TimeSlot, ServiceQualityRecord } from '../types';
 
 export const mockUsers: User[] = [
   {
@@ -129,6 +129,22 @@ export const mockActivities: Activity[] = [
     createdAt: '2024-05-20T00:00:00Z',
     updatedAt: '2024-05-22T00:00:00Z'
   }
+];
+
+export const mockTimeSlots: TimeSlot[] = [
+  { id: 'ts-001', positionId: 'pos-001', activityId: 'act-001', startTime: '2024-06-15T08:00:00Z', endTime: '2024-06-15T12:00:00Z', quota: 2 },
+  { id: 'ts-002', positionId: 'pos-001', activityId: 'act-001', startTime: '2024-06-15T12:00:00Z', endTime: '2024-06-15T16:00:00Z', quota: 2 },
+  { id: 'ts-003', positionId: 'pos-002', activityId: 'act-001', startTime: '2024-06-15T08:00:00Z', endTime: '2024-06-15T12:00:00Z', quota: 4 },
+  { id: 'ts-004', positionId: 'pos-002', activityId: 'act-001', startTime: '2024-06-15T12:00:00Z', endTime: '2024-06-15T16:00:00Z', quota: 4 },
+  { id: 'ts-005', positionId: 'pos-003', activityId: 'act-001', startTime: '2024-06-15T08:00:00Z', endTime: '2024-06-15T16:00:00Z', quota: 2 },
+  { id: 'ts-006', positionId: 'pos-007', activityId: 'act-003', startTime: '2024-05-20T08:30:00Z', endTime: '2024-05-20T12:30:00Z', quota: 2 },
+  { id: 'ts-007', positionId: 'pos-007', activityId: 'act-003', startTime: '2024-05-20T13:30:00Z', endTime: '2024-05-20T17:30:00Z', quota: 2 },
+  { id: 'ts-008', positionId: 'pos-008', activityId: 'act-003', startTime: '2024-05-20T08:30:00Z', endTime: '2024-05-20T12:30:00Z', quota: 2 },
+  { id: 'ts-009', positionId: 'pos-008', activityId: 'act-003', startTime: '2024-05-20T13:30:00Z', endTime: '2024-05-20T17:30:00Z', quota: 2 },
+  { id: 'ts-010', positionId: 'pos-004', activityId: 'act-002', startTime: '2024-06-22T09:00:00Z', endTime: '2024-06-22T13:00:00Z', quota: 5 },
+  { id: 'ts-011', positionId: 'pos-004', activityId: 'act-002', startTime: '2024-06-22T13:00:00Z', endTime: '2024-06-22T17:00:00Z', quota: 5 },
+  { id: 'ts-012', positionId: 'pos-009', activityId: 'act-004', startTime: '2024-07-01T06:00:00Z', endTime: '2024-07-01T10:00:00Z', quota: 10 },
+  { id: 'ts-013', positionId: 'pos-009', activityId: 'act-004', startTime: '2024-07-01T10:00:00Z', endTime: '2024-07-01T14:00:00Z', quota: 10 },
 ];
 
 export const mockPositions: Position[] = [
@@ -269,7 +285,8 @@ export const mockRegistrations: Registration[] = [
     status: 'confirmed',
     waitlistOrder: null,
     signUpTime: '2024-05-10T10:00:00Z',
-    confirmedTime: '2024-05-11T09:00:00Z'
+    confirmedTime: '2024-05-11T09:00:00Z',
+    selectedTimeSlotIds: ['ts-003', 'ts-004']
   },
   {
     id: 'reg-002',
@@ -279,7 +296,8 @@ export const mockRegistrations: Registration[] = [
     status: 'confirmed',
     waitlistOrder: null,
     signUpTime: '2024-05-11T14:00:00Z',
-    confirmedTime: '2024-05-12T09:00:00Z'
+    confirmedTime: '2024-05-12T09:00:00Z',
+    selectedTimeSlotIds: []
   },
   {
     id: 'reg-003',
@@ -289,7 +307,8 @@ export const mockRegistrations: Registration[] = [
     status: 'waitlist',
     waitlistOrder: 1,
     signUpTime: '2024-05-12T16:00:00Z',
-    confirmedTime: null
+    confirmedTime: null,
+    selectedTimeSlotIds: []
   },
   {
     id: 'reg-004',
@@ -299,7 +318,8 @@ export const mockRegistrations: Registration[] = [
     status: 'confirmed',
     waitlistOrder: null,
     signUpTime: '2024-05-08T11:00:00Z',
-    confirmedTime: '2024-05-09T09:00:00Z'
+    confirmedTime: '2024-05-09T09:00:00Z',
+    selectedTimeSlotIds: ['ts-001']
   },
   {
     id: 'reg-005',
@@ -309,7 +329,8 @@ export const mockRegistrations: Registration[] = [
     status: 'confirmed',
     waitlistOrder: null,
     signUpTime: '2024-04-20T10:00:00Z',
-    confirmedTime: '2024-04-21T09:00:00Z'
+    confirmedTime: '2024-04-21T09:00:00Z',
+    selectedTimeSlotIds: ['ts-006', 'ts-007']
   },
   {
     id: 'reg-006',
@@ -319,7 +340,8 @@ export const mockRegistrations: Registration[] = [
     status: 'confirmed',
     waitlistOrder: null,
     signUpTime: '2024-04-22T14:00:00Z',
-    confirmedTime: '2024-04-23T09:00:00Z'
+    confirmedTime: '2024-04-23T09:00:00Z',
+    selectedTimeSlotIds: ['ts-008', 'ts-009']
   },
   {
     id: 'reg-007',
@@ -329,7 +351,8 @@ export const mockRegistrations: Registration[] = [
     status: 'pending',
     waitlistOrder: null,
     signUpTime: '2024-05-20T10:00:00Z',
-    confirmedTime: null
+    confirmedTime: null,
+    selectedTimeSlotIds: []
   },
   {
     id: 'reg-008',
@@ -339,7 +362,8 @@ export const mockRegistrations: Registration[] = [
     status: 'confirmed',
     waitlistOrder: null,
     signUpTime: '2024-05-18T09:00:00Z',
-    confirmedTime: '2024-05-19T10:00:00Z'
+    confirmedTime: '2024-05-19T10:00:00Z',
+    selectedTimeSlotIds: []
   }
 ];
 
@@ -348,7 +372,7 @@ export const mockCheckins: CheckinRecord[] = [
     id: 'chk-001',
     registrationId: 'reg-005',
     userId: 'user-003',
-    checkinTime: '2024-05-20T08:30:00Z',
+    checkinTime: '2024-05-20T08:35:00Z',
     checkoutTime: '2024-05-20T17:30:00Z',
     status: 'checked_out'
   },
@@ -362,6 +386,69 @@ export const mockCheckins: CheckinRecord[] = [
   }
 ];
 
+export const mockServiceQualityRecords: ServiceQualityRecord[] = [
+  {
+    id: 'sq-001',
+    registrationId: 'reg-005',
+    userId: 'user-003',
+    activityId: 'act-003',
+    positionId: 'pos-007',
+    timeSlotId: 'ts-006',
+    qualityType: 'late',
+    lateMinutes: 5,
+    earlyLeaveMinutes: null,
+    rating: 'good',
+    comment: '迟到5分钟，但整体表现良好',
+    recordedBy: 'user-002',
+    recordedAt: '2024-05-20T18:00:00Z'
+  },
+  {
+    id: 'sq-002',
+    registrationId: 'reg-005',
+    userId: 'user-003',
+    activityId: 'act-003',
+    positionId: 'pos-007',
+    timeSlotId: 'ts-007',
+    qualityType: 'normal',
+    lateMinutes: null,
+    earlyLeaveMinutes: null,
+    rating: 'excellent',
+    comment: '下午表现优秀，工作认真负责',
+    recordedBy: 'user-002',
+    recordedAt: '2024-05-20T18:00:00Z'
+  },
+  {
+    id: 'sq-003',
+    registrationId: 'reg-006',
+    userId: 'user-004',
+    activityId: 'act-003',
+    positionId: 'pos-008',
+    timeSlotId: 'ts-008',
+    qualityType: 'normal',
+    lateMinutes: null,
+    earlyLeaveMinutes: null,
+    rating: 'good',
+    comment: '表现正常',
+    recordedBy: 'user-002',
+    recordedAt: '2024-05-20T18:00:00Z'
+  },
+  {
+    id: 'sq-004',
+    registrationId: 'reg-006',
+    userId: 'user-004',
+    activityId: 'act-003',
+    positionId: 'pos-008',
+    timeSlotId: 'ts-009',
+    qualityType: 'early_leave',
+    lateMinutes: null,
+    earlyLeaveMinutes: 15,
+    rating: 'average',
+    comment: '下午提前15分钟离开',
+    recordedBy: 'user-002',
+    recordedAt: '2024-05-20T18:00:00Z'
+  }
+];
+
 export const mockWorkHours: WorkHour[] = [
   {
     id: 'wh-001',
@@ -369,6 +456,7 @@ export const mockWorkHours: WorkHour[] = [
     userId: 'user-003',
     activityId: 'act-003',
     hours: 8,
+    suggestedHours: 7.9,
     status: 'approved',
     reviewerId: 'user-001',
     rejectReason: null,
@@ -381,6 +469,7 @@ export const mockWorkHours: WorkHour[] = [
     userId: 'user-004',
     activityId: 'act-003',
     hours: 7.5,
+    suggestedHours: 7.25,
     status: 'approved',
     reviewerId: 'user-001',
     rejectReason: null,
@@ -393,6 +482,7 @@ export const mockWorkHours: WorkHour[] = [
     userId: 'user-003',
     activityId: 'act-001',
     hours: 5.5,
+    suggestedHours: null,
     status: 'rejected',
     reviewerId: 'user-002',
     rejectReason: '服务时长与签到记录不符，请核实后重新提交',
@@ -406,6 +496,7 @@ export const mockWorkHours: WorkHour[] = [
     userId: 'user-003',
     activityId: 'act-001',
     hours: 6,
+    suggestedHours: null,
     status: 'draft',
     reviewerId: null,
     rejectReason: null,

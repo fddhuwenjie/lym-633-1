@@ -7,7 +7,8 @@ import {
   Award, 
   ArrowLeft,
   Menu,
-  X
+  X,
+  ClipboardCheck
 } from 'lucide-react';
 import { useState } from 'react';
 import { useUserStore } from '../../store/useUserStore';
@@ -27,6 +28,7 @@ const AdminLayout = () => {
     { path: '', icon: LayoutDashboard, label: '数据概览' },
     { path: '/activities', icon: Calendar, label: '活动管理' },
     { path: '/registrations', icon: Users, label: '报名管理' },
+    { path: '/service-review', icon: ClipboardCheck, label: '服务质量复盘' },
     { path: '/workhours', icon: Clock, label: '工时审核' },
     { path: '/certificates', icon: Award, label: '证书管理' },
   ];

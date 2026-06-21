@@ -1,19 +1,21 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   Clock, Award, Calendar, 
   ChevronRight, Award as AwardIcon,
   Edit, Send, X, AlertCircle
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useUserStore } from '../../store/useUserStore';
 import { useRegistrationStore } from '../../store/useRegistrationStore';
 import { useWorkHourStore } from '../../store/useWorkHourStore';
 import { useCertificateStore } from '../../store/useCertificateStore';
 import { useActivityStore } from '../../store/useActivityStore';
+import { useServiceQualityStore } from '../../store/useServiceQualityStore';
 import { formatDate, formatDateTime } from '../../utils/date';
 import { Link } from 'react-router-dom';
+import { ServiceQualityType, ServiceEvaluationRating } from '../../types';
 
-type TabType = 'registrations' | 'workhours' | 'certificates';
+type TabType = 'registrations' | 'workhours' | 'certificates' | 'quality';
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState<TabType>('registrations');
@@ -25,7 +27,12 @@ const Profile = () => {
   const { getRegistrationsByUserId } = useRegistrationStore();
   const { getWorkHoursByUserId, getTotalApprovedHours, updateWorkHour, resubmitWorkHour, submitWorkHour } = useWorkHourStore();
   const { getCertificatesByUserId } = useCertificateStore();
-  const { getActivityById, getPositionById } = useActivityStore();
+  const { getActivityById, getPositionById, getTimeSlotById } = useActivityStore();
+  const { loadRecords, getRecordsByUserId, getUserQualityStats } = useServiceQualityStore();
+
+  useEffect(() => {
+    loadRecords();
+  }, [loadRecords]);
 
   const currentUser = getCurrentUser();
 
@@ -33,6 +40,8 @@ const Profile = () => {
   const userWorkHours = useMemo(() => currentUser ? getWorkHoursByUserId(currentUser.id) : [], [currentUser, getWorkHoursByUserId]);
   const userCertificates = useMemo(() => currentUser ? getCertificatesByUserId(currentUser.id) : [], [currentUser, getCertificatesByUserId]);
   const totalApprovedHours = currentUser ? getTotalApprovedHours(currentUser.id) : 0;
+  const userQualityRecords = useMemo(() => currentUser ? getRecordsByUserId(currentUser.id) : [], [currentUser, getRecordsByUserId]);
+  const qualityStats = useMemo(() => currentUser ? getUserQualityStats(currentUser.id) : null, [currentUser, getUserQualityStats]);
 
   const monthlyStats = useMemo(() => {
     const months: Record<string, number> = {};
@@ -58,13 +67,40 @@ const Profile = () => {
     totalActivities: userRegistrations.filter(r => r.status === 'confirmed').length,
     totalHours: totalApprovedHours,
     totalCertificates: userCertificates.filter(c => c.status === 'valid').length,
-    totalRegistrations: userRegistrations.length
+    totalRegistrations: userRegistrations.length,
+    averageRating: qualityStats?.averageRating ?? null,
+    abnormalCount: (qualityStats?.lateCount ?? 0) + (qualityStats?.earlyLeaveCount ?? 0) + (qualityStats?.absentCount ?? 0)
+  };
+
+  const ratingDistribution = useMemo(() => {
+    if (!qualityStats) return [];
+    return [
+      { name: '优秀', value: qualityStats.ratingCounts.excellent, color: '#10b981' },
+      { name: '良好', value: qualityStats.ratingCounts.good, color: '#3b82f6' },
+      { name: '一般', value: qualityStats.ratingCounts.average, color: '#f59e0b' },
+      { name: '较差', value: qualityStats.ratingCounts.poor, color: '#ef4444' }
+    ];
+  }, [qualityStats]);
+
+  const qualityTypeLabel: Record<ServiceQualityType, string> = {
+    normal: '正常',
+    late: '迟到',
+    early_leave: '早退',
+    absent: '缺勤'
+  };
+
+  const qualityRatingLabel: Record<ServiceEvaluationRating, string> = {
+    excellent: '优秀',
+    good: '良好',
+    average: '一般',
+    poor: '较差'
   };
 
   const tabs = [
     { key: 'registrations' as TabType, label: '报名记录', icon: Calendar },
     { key: 'workhours' as TabType, label: '工时记录', icon: Clock },
     { key: 'certificates' as TabType, label: '我的证书', icon: Award },
+    { key: 'quality' as TabType, label: '服务质量', icon: AwardIcon },
   ];
 
   if (!currentUser) {
@@ -162,7 +198,7 @@ const Profile = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 p-6">
           <div className="text-center p-4 bg-slate-50 rounded-xl">
             <div className="text-3xl font-bold text-primary-600 mb-1">
               {stats.totalActivities}
@@ -186,6 +222,18 @@ const Profile = () => {
               {stats.totalRegistrations}
             </div>
             <p className="text-sm text-slate-500">报名次数</p>
+          </div>
+          <div className="text-center p-4 bg-slate-50 rounded-xl">
+            <div className="text-3xl font-bold text-teal-600 mb-1">
+              {stats.averageRating !== null ? stats.averageRating.toFixed(2) : '-'}
+            </div>
+            <p className="text-sm text-slate-500">平均服务评价</p>
+          </div>
+          <div className="text-center p-4 bg-slate-50 rounded-xl">
+            <div className="text-3xl font-bold text-rose-600 mb-1">
+              {stats.abnormalCount}
+            </div>
+            <p className="text-sm text-slate-500">异常次数</p>
           </div>
         </div>
       </div>
@@ -457,6 +505,170 @@ const Profile = () => {
                       );
                     })}
                 </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'quality' && (
+            <div className="space-y-6">
+              {!qualityStats || userQualityRecords.length === 0 ? (
+                <div className="text-center py-12">
+                  <AwardIcon className="mx-auto text-slate-300 mb-3" size={48} />
+                  <p className="text-slate-500">暂无服务质量记录</p>
+                  <p className="text-sm text-slate-400 mt-1">
+                    完成志愿服务后将生成服务质量记录
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-800 mb-4">
+                      质量统计概览
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="text-center p-4 bg-green-50 rounded-xl">
+                        <div className="text-2xl font-bold text-green-600 mb-1">
+                          {qualityStats.normalCount}
+                        </div>
+                        <p className="text-sm text-slate-500">正常</p>
+                      </div>
+                      <div className="text-center p-4 bg-amber-50 rounded-xl">
+                        <div className="text-2xl font-bold text-amber-600 mb-1">
+                          {qualityStats.lateCount}
+                        </div>
+                        <p className="text-sm text-slate-500">迟到</p>
+                      </div>
+                      <div className="text-center p-4 bg-orange-50 rounded-xl">
+                        <div className="text-2xl font-bold text-orange-600 mb-1">
+                          {qualityStats.earlyLeaveCount}
+                        </div>
+                        <p className="text-sm text-slate-500">早退</p>
+                      </div>
+                      <div className="text-center p-4 bg-red-50 rounded-xl">
+                        <div className="text-2xl font-bold text-red-600 mb-1">
+                          {qualityStats.absentCount}
+                        </div>
+                        <p className="text-sm text-slate-500">缺勤</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-800 mb-4">
+                      评价分布
+                    </h3>
+                    {ratingDistribution.some(d => d.value > 0) ? (
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={ratingDistribution}
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              dataKey="value"
+                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                            >
+                              {ratingDistribution.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 bg-slate-50 rounded-xl">
+                        <p className="text-slate-500">暂无评价数据</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-800 mb-4">
+                      服务质量记录
+                    </h3>
+                    <div className="space-y-3">
+                      {userQualityRecords
+                        .sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime())
+                        .map(record => {
+                          const activity = getActivityById(record.activityId);
+                          const position = getPositionById(record.positionId);
+                          const timeSlot = record.timeSlotId ? getTimeSlotById(record.timeSlotId) : null;
+                          
+                          const typeBadgeClass = (type: ServiceQualityType) => {
+                            switch (type) {
+                              case 'normal':
+                                return 'badge-success';
+                              case 'late':
+                                return 'badge-warning';
+                              case 'early_leave':
+                                return 'badge-warning';
+                              case 'absent':
+                                return 'badge-error';
+                              default:
+                                return 'badge-info';
+                            }
+                          };
+
+                          const ratingBadgeClass = (rating: ServiceEvaluationRating | null) => {
+                            switch (rating) {
+                              case 'excellent':
+                                return 'badge-success';
+                              case 'good':
+                                return 'badge-info';
+                              case 'average':
+                                return 'badge-warning';
+                              case 'poor':
+                                return 'badge-error';
+                              default:
+                                return '';
+                            }
+                          };
+
+                          return (
+                            <div
+                              key={record.id}
+                              className="p-4 bg-slate-50 rounded-xl"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium text-slate-800 truncate">
+                                    {activity?.title || '未知活动'}
+                                  </h4>
+                                  <p className="text-sm text-slate-500 mt-1">
+                                    {position?.name || '未知岗位'}
+                                    {timeSlot && ` · ${timeSlot.startTime}-${timeSlot.endTime}`}
+                                  </p>
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                    <span className={`badge ${typeBadgeClass(record.qualityType)}`}>
+                                      {qualityTypeLabel[record.qualityType]}
+                                      {record.qualityType === 'late' && record.lateMinutes && ` (${record.lateMinutes}分钟)`}
+                                      {record.qualityType === 'early_leave' && record.earlyLeaveMinutes && ` (${record.earlyLeaveMinutes}分钟)`}
+                                    </span>
+                                    {record.rating && (
+                                      <span className={`badge ${ratingBadgeClass(record.rating)}`}>
+                                        {qualityRatingLabel[record.rating]}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {record.comment && (
+                                    <p className="text-sm text-slate-600 mt-2 bg-white p-2 rounded-lg">
+                                      {record.comment}
+                                    </p>
+                                  )}
+                                  <p className="text-xs text-slate-400 mt-2">
+                                    记录时间：{formatDateTime(record.recordedAt)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           )}

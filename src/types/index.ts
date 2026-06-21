@@ -5,3 +5,4 @@ export * from './checkin';
 export * from './workHour';
 export * from './certificate';
 export * from './export';
+export * from './serviceQuality';

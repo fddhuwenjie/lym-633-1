@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import ActivityDetail from './pages/ActivityDetail/ActivityDetail';
 import Profile from './pages/Profile/Profile';
 import ExportPage from './pages/Export/ExportPage';
+import ServiceReview from './pages/Admin/ServiceReview';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import AdminActivities from './pages/Admin/AdminActivities';
 import ActivityForm from './pages/Admin/ActivityForm';
@@ -19,6 +20,7 @@ import { useCheckinStore } from './store/useCheckinStore';
 import { useWorkHourStore } from './store/useWorkHourStore';
 import { useCertificateStore } from './store/useCertificateStore';
 import { useExportStore } from './store/useExportStore';
+import { useServiceQualityStore } from './store/useServiceQualityStore';
 
 function App() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -30,6 +32,7 @@ function App() {
   const loadWorkHours = useWorkHourStore(state => state.loadWorkHours);
   const loadCertificates = useCertificateStore(state => state.loadCertificates);
   const loadExportHistory = useExportStore(state => state.loadExportHistory);
+  const loadServiceQuality = useServiceQualityStore(state => state.loadRecords);
 
   useEffect(() => {
     loadUsers();
@@ -39,6 +42,7 @@ function App() {
     loadWorkHours();
     loadCertificates();
     loadExportHistory();
+    loadServiceQuality();
     setIsLoaded(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -71,6 +75,7 @@ function App() {
         <Route path="registrations" element={<AdminRegistrations />} />
         <Route path="workhours" element={<AdminWorkHours />} />
         <Route path="certificates" element={<AdminCertificates />} />
+        <Route path="service-review" element={<ServiceReview />} />
       </Route>
       
       <Route path="*" element={<Navigate to="/" replace />} />

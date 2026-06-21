@@ -9,4 +9,5 @@ export interface Registration {
   waitlistOrder: number | null;
   signUpTime: string;
   confirmedTime: string | null;
+  selectedTimeSlotIds: string[];
 }

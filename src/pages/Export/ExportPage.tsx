@@ -6,15 +6,17 @@ import { useWorkHourStore } from '../../store/useWorkHourStore';
 import { useCertificateStore } from '../../store/useCertificateStore';
 import { useActivityStore } from '../../store/useActivityStore';
 import { useRegistrationStore } from '../../store/useRegistrationStore';
+import { useServiceQualityStore } from '../../store/useServiceQualityStore';
 import { useExportStore } from '../../store/useExportStore';
-import { formatDate, formatDateTime } from '../../utils/date';
+import { formatDate, formatDateTime, formatTime } from '../../utils/date';
 
 const ExportPage = () => {
   const { getCurrentUser } = useUserStore();
   const { getWorkHoursByUserId, workHours } = useWorkHourStore();
   const { getCertificateByWorkHourId } = useCertificateStore();
-  const { getActivityById, activities } = useActivityStore();
+  const { getActivityById, activities, getTimeSlotsByIds } = useActivityStore();
   const { getRegistrationById } = useRegistrationStore();
+  const { getRecordsByRegistrationId } = useServiceQualityStore();
   const { addExportRecord, getExportHistoryByUserId } = useExportStore();
 
   const [activityFilter, setActivityFilter] = useState<string>('all');
@@ -56,12 +58,28 @@ const ExportPage = () => {
   const handleExport = () => {
     if (!currentUser || filteredWorkHours.length === 0) return;
 
+    const qualityTypeMap: Record<string, string> = {
+      late: '迟到',
+      early_leave: '早退',
+      absent: '缺勤',
+      normal: '正常'
+    };
+
+    const ratingMap: Record<string, string> = {
+      excellent: '优秀',
+      good: '良好',
+      average: '一般',
+      poor: '较差'
+    };
+
     const exportData = filteredWorkHours.map(wh => {
       const activity = getActivityById(wh.activityId);
       const cert = getCertificateByWorkHourId(wh.id);
       const reg = getRegistrationById(wh.registrationId);
       const positions = useActivityStore.getState().getPositionsByActivityId(wh.activityId);
       const position = positions.find(p => p.id === reg?.positionId);
+      const timeSlots = reg ? getTimeSlotsByIds(reg.selectedTimeSlotIds) : [];
+      const qualityRecords = reg ? getRecordsByRegistrationId(reg.id) : [];
 
       const statusMap: Record<string, string> = {
         draft: '草稿',
@@ -70,10 +88,29 @@ const ExportPage = () => {
         rejected: '已退回'
       };
 
+      const timeSlotStr = timeSlots
+        .sort((a, b) => a.startTime.localeCompare(b.startTime))
+        .map(slot => `${formatTime(slot.startTime)}-${formatTime(slot.endTime)}`)
+        .join(';');
+
+      const qualityTypes = Array.from(new Set(qualityRecords.map(r => r.qualityType)));
+      const qualityTypeStr = qualityTypes
+        .map(type => qualityTypeMap[type] || type)
+        .join(';');
+
+      const ratings = Array.from(new Set(qualityRecords.map(r => r.rating).filter(Boolean) as string[]));
+      const ratingStr = ratings
+        .map(r => ratingMap[r] || r)
+        .join(';');
+
       return {
         '活动名称': activity?.title || '',
         '岗位名称': position?.name || '',
+        '排班时段': timeSlotStr,
         '服务时长(小时)': wh.hours,
+        '建议时长(小时)': wh.suggestedHours !== null ? wh.suggestedHours : '',
+        '异常类型': qualityTypeStr,
+        '评价等级': ratingStr,
         '审核状态': statusMap[wh.status] || wh.status,
         '证书编号': cert?.certificateNo || '暂无',
         '提交时间': wh.submittedAt ? formatDateTime(wh.submittedAt) : '',
@@ -228,7 +265,7 @@ const ExportPage = () => {
             <h3 className="font-semibold text-primary-800 mb-3">导出说明</h3>
             <ul className="text-sm text-primary-700 space-y-1.5">
               <li>• 导出格式为 CSV，可用 Excel 打开</li>
-              <li>• 包含活动、岗位、审核状态、证书编号</li>
+              <li>• 包含活动、岗位、排班时段、服务时长、建议时长、异常类型、评价等级、审核状态、证书编号等</li>
               <li>• 仅导出符合筛选条件的记录</li>
               <li>• 导出记录将保存在历史中可复查</li>
             </ul>
@@ -257,7 +294,11 @@ const ExportPage = () => {
                   <thead>
                     <tr>
                       <th>活动名称</th>
+                      <th>排班时段</th>
                       <th>服务时长</th>
+                      <th>建议时长</th>
+                      <th>异常类型</th>
+                      <th>评价等级</th>
                       <th>审核状态</th>
                       <th>证书编号</th>
                       <th>提交时间</th>
@@ -268,16 +309,68 @@ const ExportPage = () => {
                     {filteredWorkHours.map(wh => {
                       const activity = getActivityById(wh.activityId);
                       const cert = getCertificateByWorkHourId(wh.id);
+                      const reg = getRegistrationById(wh.registrationId);
+                      const timeSlots = reg ? getTimeSlotsByIds(reg.selectedTimeSlotIds) : [];
+                      const qualityRecords = reg ? getRecordsByRegistrationId(reg.id) : [];
+
+                      const qualityTypeMap: Record<string, string> = {
+                        late: '迟到',
+                        early_leave: '早退',
+                        absent: '缺勤',
+                        normal: '正常'
+                      };
+
+                      const ratingMap: Record<string, string> = {
+                        excellent: '优秀',
+                        good: '良好',
+                        average: '一般',
+                        poor: '较差'
+                      };
+
+                      const timeSlotStr = timeSlots
+                        .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                        .map(slot => `${formatTime(slot.startTime)}-${formatTime(slot.endTime)}`)
+                        .join(';');
+
+                      const qualityTypes = Array.from(new Set(qualityRecords.map(r => r.qualityType)));
+                      const qualityTypeStr = qualityTypes
+                        .map(type => qualityTypeMap[type] || type)
+                        .join(';');
+
+                      const ratings = Array.from(new Set(qualityRecords.map(r => r.rating).filter(Boolean) as string[]));
+                      const ratingStr = ratings
+                        .map(r => ratingMap[r] || r)
+                        .join(';');
+
                       return (
                         <tr key={wh.id}>
                           <td className="font-medium text-slate-800">
                             {activity?.title}
+                          </td>
+                          <td className="text-sm text-slate-600">
+                            {timeSlotStr || '-'}
                           </td>
                           <td>
                             <span className="font-semibold text-primary-600">
                               {wh.hours}
                             </span>
                             <span className="text-sm text-slate-500 ml-1">小时</span>
+                          </td>
+                          <td className="text-sm text-slate-600">
+                            {wh.suggestedHours !== null ? (
+                              <>
+                                <span className="font-semibold text-primary-600">
+                                  {wh.suggestedHours}
+                                </span>
+                                <span className="text-sm text-slate-500 ml-1">小时</span>
+                              </>
+                            ) : '-'}
+                          </td>
+                          <td className="text-sm text-slate-600">
+                            {qualityTypeStr || '-'}
+                          </td>
+                          <td className="text-sm text-slate-600">
+                            {ratingStr || '-'}
                           </td>
                           <td>
                             <span className={`badge ${statusBadgeClass(wh.status)}`}>
